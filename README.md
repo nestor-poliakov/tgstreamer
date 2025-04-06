@@ -1,7 +1,7 @@
 # Tg Streamer
 Infinite stream to telegram channel with videos from YouTube
 
-- [X] download videos with yt-dlp
+- [X] Download videos with yt-dlp
 - [ ] stream one file
 - [ ] stream multiple files one by one
 - [ ] download files from YouTube before streaming
