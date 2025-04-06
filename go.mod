@@ -2,7 +2,10 @@ module tgstreamer
 
 go 1.24
 
-require gopkg.in/yaml.v3 v3.0.1
+require (
+	github.com/nestor-poliakov/joy5 v0.0.0-20250406181521-54374d34636f
+	gopkg.in/yaml.v3 v3.0.1
+)
 
 require (
 	github.com/kr/pretty v0.3.1 // indirect

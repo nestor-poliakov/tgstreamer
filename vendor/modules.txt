@@ -1,5 +1,15 @@
 # github.com/kr/pretty v0.3.1
 ## explicit; go 1.12
+# github.com/nestor-poliakov/joy5 v0.0.0-20250406181521-54374d34636f
+## explicit; go 1.24
+github.com/nestor-poliakov/joy5/av
+github.com/nestor-poliakov/joy5/codec/aac
+github.com/nestor-poliakov/joy5/codec/h264
+github.com/nestor-poliakov/joy5/format/flv
+github.com/nestor-poliakov/joy5/format/flv/flvio
+github.com/nestor-poliakov/joy5/format/rtmp
+github.com/nestor-poliakov/joy5/utils/bits
+github.com/nestor-poliakov/joy5/utils/bits/pio
 # github.com/rogpeppe/go-internal v1.13.1
 ## explicit; go 1.22
 # gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c

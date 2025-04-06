@@ -10,7 +10,8 @@ import (
 )
 
 type Config struct {
-	YtDlpCmd string
+	YtDlpCmd     string `yaml:"ytdlpcmd"`
+	StreamingUrl string `yaml:"streaming_url"`
 }
 
 func ReadConfig() (conf Config) {
