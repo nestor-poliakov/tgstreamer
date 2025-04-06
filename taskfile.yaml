@@ -1,0 +1,11 @@
+version: "3"
+env:
+
+tasks:
+  run:
+    cmds:
+      - go run main.go --config=config/.local.yaml
+  docker:
+    cmds:
+      - docker build -t tgstreamer .
+      - docker run --name tgstreamer tgstreamer
