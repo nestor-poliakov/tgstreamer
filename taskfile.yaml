@@ -9,3 +9,6 @@ tasks:
     cmds:
       - docker build -t tgstreamer .
       - docker run --name tgstreamer tgstreamer
+  conv:
+    cmds:
+      - go run cmd/mp42flv.go local/videos/DeumyOzKqgI.mp4

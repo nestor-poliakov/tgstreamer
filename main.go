@@ -18,8 +18,8 @@ func main() {
 	conf := app.ReadConfig()
 	fmt.Printf("%+v\n", conf)
 
-	client := rpc.NewYtDlpClient("local/videos", conf.YtDlpCmd)
-	fmt.Println(client.Download(stopContext, "dQw4w9WgXcQ"))
+	client := rpc.NewYtDlpClient(conf.VideosDir)
+	fmt.Println(client.Download(stopContext, "https://www.youtube.com/watch?v=qjxxYoL7nSU"))
 
 	streamer.PlayVideos(stopContext, conf.StreamingUrl)
 }

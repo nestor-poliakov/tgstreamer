@@ -10,7 +10,7 @@ import (
 )
 
 type Config struct {
-	YtDlpCmd     string `yaml:"ytdlpcmd"`
+	VideosDir    string `yaml:"videos_dir"`
 	StreamingUrl string `yaml:"streaming_url"`
 }
 

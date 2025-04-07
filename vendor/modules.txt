@@ -12,6 +12,11 @@ github.com/nestor-poliakov/joy5/utils/bits
 github.com/nestor-poliakov/joy5/utils/bits/pio
 # github.com/rogpeppe/go-internal v1.13.1
 ## explicit; go 1.22
+# github.com/yapingcat/gomedia v0.0.0-20240906162731-17feea57090c
+## explicit; go 1.16
+github.com/yapingcat/gomedia/go-codec
+github.com/yapingcat/gomedia/go-flv
+github.com/yapingcat/gomedia/go-mp4
 # gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 ## explicit; go 1.11
 # gopkg.in/yaml.v3 v3.0.1

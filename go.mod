@@ -4,6 +4,7 @@ go 1.24
 
 require (
 	github.com/nestor-poliakov/joy5 v0.0.0-20250406181521-54374d34636f
+	github.com/yapingcat/gomedia v0.0.0-20240906162731-17feea57090c
 	gopkg.in/yaml.v3 v3.0.1
 )
 

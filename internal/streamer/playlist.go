@@ -12,14 +12,18 @@ func PlayVideos(ctx context.Context, streamingUrl string) {
 	NewStreamer(streamingUrl, packetsCh).Run(ctx)
 	videos <- app.Video{
 		Id:       1,
-		FileName: "local/videos/video.flv",
+		FileName: "/Users/nestor/go/src/tgstreamer/local/videos/https:||www.youtube.com|watch?v=qjxxYoL7nSU.mp4",
 	}
 	videos <- app.Video{
 		Id:       2,
-		FileName: "local/videos/DeumyOzKqgI.flv",
+		FileName: "local/videos/video.flv",
 	}
 	videos <- app.Video{
 		Id:       3,
+		FileName: "local/videos/DeumyOzKqgI.flv",
+	}
+	videos <- app.Video{
+		Id:       4,
 		FileName: "local/videos/dQw4w9WgXcQ.flv",
 	}
 	<-ctx.Done()

@@ -24,10 +24,6 @@ type Streamer struct {
 
 func NewStreamer(streamingUrl string, ch <-chan piece) *Streamer {
 	client := rtmp.NewClient()
-	logger := log.Defaults().With("worker", "streamer")
-	client.LogEvent = func(c *rtmp.Conn, nc net.Conn, e int) {
-		logger.Debugf("Event: %s", rtmp.EventString[e])
-	}
 
 	return &Streamer{
 		url:     streamingUrl,
@@ -41,6 +37,9 @@ func NewStreamer(streamingUrl string, ch <-chan piece) *Streamer {
 func (s *Streamer) reconnect() (err error) {
 	if s.nconn != nil {
 		s.nconn.Close()
+	}
+	if s.url == "" {
+		return fmt.Errorf("empty streaming url")
 	}
 	s.conn, s.nconn, err = s.client.Dial(s.url, rtmp.PrepareWriting)
 	if err != nil {
@@ -64,6 +63,7 @@ func (s *Streamer) streamingLoop(ctx context.Context) {
 		log.FromContext(ctx).Info("streaming ended; closing connection")
 		s.nconn.Close()
 	}()
+	videoCtx := ctx
 	for {
 		select {
 		case <-ctx.Done():
@@ -73,17 +73,19 @@ func (s *Streamer) streamingLoop(ctx context.Context) {
 				return
 			}
 			if piece.videoId != s.curVideoId {
-				log.FromContext(ctx).Info("start streaming new video")
 				s.rl = newRateLimiter()
 				s.configs = s.configs[:0]
 				s.curVideoId = piece.videoId
+				videoCtx = log.With(ctx, "video_id", piece.videoId)
+				log.FromContext(videoCtx).Info("start streaming new video")
 			}
 			if len(piece.packets) == 0 {
 				continue
 			}
-			err := s.processPackets(ctx, piece.packets)
+			err := s.processPackets(videoCtx, piece.packets)
 			if err != nil {
-				panic(err)
+				log.FromContexts(videoCtx).With("error", err).Errorf("process %d packets", len(piece.packets))
+				continue
 			}
 		}
 	}
