@@ -3,8 +3,8 @@ Infinite stream to telegram channel with videos from YouTube
 
 - [x] Download videos with yt-dlp
 - [x] stream one flv file
+- [x] stream multiple files one by one
 - [ ] stream mp4 file
-- [ ] stream multiple files one by one
 - [ ] download files from YouTube before streaming
 - [ ] stream videos from playlist in db
 - [ ] cut ad using data from SponsorBlock

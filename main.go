@@ -14,10 +14,12 @@ func main() {
 	stopContext := context.Background()
 	stopContext, stopFunc := signal.NotifyContext(stopContext, syscall.SIGINT, syscall.SIGTERM)
 	defer stopFunc()
+
 	conf := app.ReadConfig()
+	fmt.Printf("%+v\n", conf)
 
 	client := rpc.NewYtDlpClient("local/videos", conf.YtDlpCmd)
 	fmt.Println(client.Download(stopContext, "dQw4w9WgXcQ"))
 
-	streamer.Stream(stopContext, "local/videos/video.flv", conf.StreamingUrl)
+	streamer.PlayVideos(stopContext, conf.StreamingUrl)
 }
