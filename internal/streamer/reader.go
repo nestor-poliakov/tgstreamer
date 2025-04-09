@@ -66,6 +66,13 @@ func (r *Reader) readingLoop(ctx context.Context) {
 }
 
 func (r *Reader) processVideo(ctx context.Context, video app.Video) (err error) {
+	if video.FileName == "" {
+		log.FromContexts(ctx).Info("start downloading video " + video.Url)
+		video.FileName, err = r.downloader.Download(ctx, video.Url)
+		if err != nil {
+			return fmt.Errorf("download video: %w", err)
+		}
+	}
 	log.FromContexts(ctx).Infof("start reading new video %q", video.FileName)
 	var reader io.ReadCloser
 	var m flvio.AMFMap
