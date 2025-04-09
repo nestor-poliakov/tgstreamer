@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path"
 	"strings"
+	"time"
 
 	"tgstreamer/lib/log"
 )
@@ -30,6 +31,7 @@ func (y *YtDlpClient) Download(ctx context.Context, videoUrl string) (string, er
 		log.FromContexts(ctx).Debugf("file %s already exist", fileName)
 		return fileName, nil
 	}
+	t := time.Now()
 	cmd := exec.CommandContext(ctx, "yt-dlp", "-f", "mp4", "--geo-bypass", "-o", fileName, videoUrl)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -37,6 +39,11 @@ func (y *YtDlpClient) Download(ctx context.Context, videoUrl string) (string, er
 	if err != nil {
 		return "", fmt.Errorf("run command %q: %w", cmd.String(), err)
 	}
+	info, err := os.Stat(fileName)
+	if err != nil {
+		return "", fmt.Errorf("stat file %q: %w", fileName, err)
+	}
+	log.FromContexts(ctx).Infof("%dMB downloaded for %s", info.Size()/1024/1024, time.Since(t))
 	return fileName, nil
 }
 

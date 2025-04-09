@@ -4,12 +4,13 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"time"
 )
 
 var defaultLogger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 	AddSource:   false,
 	Level:       slog.LevelDebug,
-	ReplaceAttr: nil,
+	ReplaceAttr: replaceAttr,
 }))
 
 type loggerCtxKey struct{}
@@ -53,7 +54,7 @@ func New(conf Config) *slog.Logger {
 	opts := &slog.HandlerOptions{
 		AddSource:   false,
 		Level:       level,
-		ReplaceAttr: nil,
+		ReplaceAttr: replaceAttr,
 	}
 	var h slog.Handler
 	if conf.Text {
@@ -63,4 +64,11 @@ func New(conf Config) *slog.Logger {
 	}
 	defaultLogger = slog.New(h)
 	return defaultLogger
+}
+
+func replaceAttr(groups []string, a slog.Attr) slog.Attr {
+	if a.Key == "time" {
+		a.Value = slog.StringValue(a.Value.Time().Format(time.TimeOnly))
+	}
+	return a
 }

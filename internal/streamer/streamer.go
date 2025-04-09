@@ -45,6 +45,7 @@ func (s *Streamer) reconnect() (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to connect to rtmp server %q: %w", s.url, err)
 	}
+
 	return nil
 }
 
@@ -92,11 +93,14 @@ func (s *Streamer) streamingLoop(ctx context.Context) {
 }
 
 func (s *Streamer) processPackets(ctx context.Context, packets []av.Packet) error {
-	log.FromContexts(ctx).Debugf("processing %d packets from %s to %s", len(packets), packets[0].Time, packets[len(packets)-1].Time)
+	config, videos, audios := calcPackets(packets)
+	log.FromContexts(ctx).Debugf("processing %d packets from %s to %s; c: %d a: %d v: %d", len(packets), packets[0].Time, packets[len(packets)-1].Time, config, audios, videos)
 	for i := range packets {
 		err := s.processPacket(packets[i])
 		if err != nil {
-			log.FromContexts(ctx).With("error", err).Error("processing packet %q", av.PacketTypeString[packets[i].Type])
+			log.FromContexts(ctx).With("error", err).Error("processing packet %q; reconnecting", av.PacketTypeString[packets[i].Type])
+			s.reconnect()
+			i--
 		}
 	}
 	return nil
@@ -115,15 +119,22 @@ func (s *Streamer) processPacket(packet av.Packet) error {
 	if packet.Type <= 2 {
 		s.rl.Limit(packet)
 	} else {
+
 		s.configs = append(s.configs, packet)
 	}
-	for {
-		err := s.conn.WritePacket(packet)
-		if err != nil {
-			err = s.reconnect()
-			continue
+	return s.conn.WritePacket(packet)
+}
+
+func calcPackets(packets []av.Packet) (configs int, video int, audio int) {
+	for _, p := range packets {
+		switch p.Type {
+		case av.AAC:
+			audio++
+		case av.H264:
+			video++
+		default:
+			configs++
 		}
-		break
 	}
-	return nil
+	return
 }

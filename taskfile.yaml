@@ -1,14 +1,17 @@
 version: "3"
 env:
-
+  VIDEO: "https://www.youtube.com/watch?v=8OkpRK2_gVs"
 tasks:
   run:
+    desc: Run main.go
     cmds:
       - go run main.go --config=config/.local.yaml
   docker:
+    desc: Build and run docker image
     cmds:
       - docker build -t tgstreamer .
       - docker run --name tgstreamer tgstreamer
-  conv:
+  vinfo:
+    desc: Get video info
     cmds:
-      - go run cmd/mp42flv.go local/videos/DeumyOzKqgI.mp4
+      - yt-dlp -F "$VIDEO"
