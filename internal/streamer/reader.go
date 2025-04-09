@@ -43,10 +43,8 @@ func (r *Reader) Run(ctx context.Context) {
 }
 
 func (r *Reader) readingLoop(ctx context.Context) {
-	defer func() {
-		log.FromContexts(ctx).Info("reader stopped")
-		close(r.ch)
-	}()
+	defer log.FromContexts(ctx).Info("reader stopped")
+	defer close(r.ch)
 	vctx := ctx
 	for {
 		select {
@@ -173,9 +171,13 @@ func (r *Reader) processReader(ctx context.Context, reader io.Reader, video app.
 		if err != nil {
 			return fmt.Errorf("read until key frame: %w", err)
 		}
-		r.ch <- piece{
+		select {
+		case r.ch <- piece{
 			videoId: video.Id,
 			packets: packets,
+		}:
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 		keyFrames = []av.Packet{keyFrame}
 	}

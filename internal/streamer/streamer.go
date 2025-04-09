@@ -60,10 +60,9 @@ func (s *Streamer) Run(ctx context.Context) error {
 }
 
 func (s *Streamer) streamingLoop(ctx context.Context) {
-	defer func() {
-		log.FromContext(ctx).Info("streaming ended; closing connection")
-		s.nconn.Close()
-	}()
+	defer log.FromContext(ctx).Info("streaming ended; closing connection")
+	defer s.nconn.Close()
+
 	videoCtx := ctx
 	for {
 		select {
