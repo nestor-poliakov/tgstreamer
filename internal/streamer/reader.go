@@ -7,9 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+
 	"os"
 	"strings"
+	"sync"
 	"tgstreamer/internal/app"
+	"tgstreamer/internal/rpc"
 	"tgstreamer/lib/log"
 
 	"github.com/nestor-poliakov/joy5/av"
@@ -19,17 +22,13 @@ import (
 	gomp4 "github.com/yapingcat/gomedia/go-mp4"
 )
 
-type Downloader interface {
-	Download(ctx context.Context, url string) (string, error)
-}
-
 type Reader struct {
 	videos     <-chan app.Video
 	ch         chan<- piece
-	downloader Downloader
+	downloader *rpc.YtDlpClient
 }
 
-func NewReader(videos <-chan app.Video, ch chan<- piece, downloader Downloader) *Reader {
+func NewReader(videos <-chan app.Video, ch chan<- piece, downloader *rpc.YtDlpClient) *Reader {
 	return &Reader{
 		videos:     videos,
 		ch:         ch,
@@ -37,12 +36,14 @@ func NewReader(videos <-chan app.Video, ch chan<- piece, downloader Downloader) 
 	}
 }
 
-func (r *Reader) Run(ctx context.Context) {
+func (r *Reader) Run(ctx context.Context, wg *sync.WaitGroup) {
 	ctx = log.With(ctx, "worker", "reader")
-	go r.readingLoop(ctx)
+	wg.Add(1)
+	go r.readingLoop(ctx, wg)
 }
 
-func (r *Reader) readingLoop(ctx context.Context) {
+func (r *Reader) readingLoop(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
 	defer log.FromContexts(ctx).Info("reader stopped")
 	defer close(r.ch)
 	vctx := ctx
@@ -65,8 +66,8 @@ func (r *Reader) readingLoop(ctx context.Context) {
 
 func (r *Reader) processVideo(ctx context.Context, video app.Video) (err error) {
 	if video.FileName == "" {
-		log.FromContexts(ctx).Info("start downloading video " + video.Url)
-		video.FileName, err = r.downloader.Download(ctx, video.Url)
+
+		video.FileName, err = r.downloader.DownloadYt(ctx, video)
 		if err != nil {
 			return fmt.Errorf("download video: %w", err)
 		}
@@ -90,7 +91,6 @@ func (r *Reader) processVideo(ctx context.Context, video app.Video) (err error) 
 	return r.processReader(ctx, reader, video, m)
 }
 
-// There is a way to read mp4 packets and convert them to flv packets directly.
 func (r *Reader) getMp4Reader(ctx context.Context, fileName string) (io.ReadCloser, flvio.AMFMap, error) {
 	pr, pw := io.Pipe()
 	f, err := os.Open(fileName)
@@ -109,6 +109,7 @@ func (r *Reader) getMp4Reader(ctx context.Context, fileName string) (io.ReadClos
 	}
 	m := ConvertToMetadata(demuxer.GetMp4Info(), tracks)
 	go func() {
+		defer log.FromContext(ctx).Info("stop reading mp4 file")
 		defer f.Close()
 		defer pr.CloseWithError(io.EOF)
 		for {
@@ -129,8 +130,11 @@ func (r *Reader) getMp4Reader(ctx context.Context, fileName string) (io.ReadClos
 			default:
 				err = fmt.Errorf("unknoun packet type %d", p.Cid)
 			}
+			if errors.Is(err, io.ErrClosedPipe) {
+				return
+			}
 			if err != nil {
-				log.FromContexts(ctx).Errorf("write flv packet: %w", err)
+				log.FromContexts(ctx).With("error", err).Errorf("write flv packet")
 				return
 			}
 		}

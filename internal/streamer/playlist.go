@@ -2,61 +2,92 @@ package streamer
 
 import (
 	"context"
+	"sync"
 	"tgstreamer/internal/app"
-	"tgstreamer/internal/rpc"
+	"tgstreamer/internal/logic"
+	"tgstreamer/lib/log"
+	"time"
 )
 
-func PlayVideos(ctx context.Context, config app.Config) {
-	packetsCh := make(chan piece, 10)
-	videos := make(chan app.Video, 10)
-	ytDlpClient := rpc.NewYtDlpClient(config.VideosDir)
-	NewReader(videos, packetsCh, ytDlpClient).Run(ctx)
-	NewStreamer(config.StreamingUrl, packetsCh).Run(ctx)
-	videos <- app.Video{
-		Id:  101,
-		Url: "https://www.youtube.com/watch?v=4evV8Fr5A8U",
-	}
-	videos <- app.Video{
-		Id:  1,
-		Url: "https://www.youtube.com/watch?v=8OkpRK2_gVs",
-	}
+// func PlayVideos(ctx context.Context, config app.Config) {
+// 	p := NewPlaylist(app.Stream{
+// 		Id:   1,
+// 		Name: "anime openings",
+// 		Settings: app.Settings{
+// 			"url": config.StreamingUrl,
+// 		},
+// 	}, rpc.NewYtDlpClient(config.VideosDir), logic.NewPlaylist(postgres.NewPlaylist(), postgres.NewVideo()))
+// 	p.Run(ctx)
+// 	<-ctx.Done()
+// 	p.Stop()
+// }
 
-	videos <- app.Video{
-		Id:  2,
-		Url: "https://www.youtube.com/watch?v=jIfogFtgV-o",
+type Playlist struct {
+	playlistLogic *logic.Playlist
+	stream        app.Stream
+	toReader      chan<- app.Video
+	stopFunc      func()
+}
+
+func NewPlaylist(toReader chan<- app.Video, s app.Stream, playlistLogic *logic.Playlist) *Playlist {
+	pl := &Playlist{
+		playlistLogic: playlistLogic,
+		stream:        s,
+		toReader:      toReader,
 	}
-	videos <- app.Video{
-		Id:  3,
-		Url: "https://www.youtube.com/watch?v=a4na2opArGY",
+	return pl
+}
+
+func (m *Playlist) Run(ctx context.Context, wg *sync.WaitGroup) {
+	ctx = log.With(ctx, "worker", "playlist")
+	wg.Add(1)
+	go m.processingLoop(ctx, wg)
+}
+
+func (m *Playlist) processingLoop(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
+	defer close(m.toReader)
+	plii, video := m.getCurrent(ctx)
+	log.FromContexts(ctx).Debugf("current playlist item: %d", plii)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case m.toReader <- video:
+		}
+		plii, video = m.getNext(ctx, plii)
+		log.FromContexts(ctx).Debugf("next playlist item: %d", plii)
 	}
-	videos <- app.Video{
-		Id:  4,
-		Url: "https://www.youtube.com/watch?v=0YF8vecQWYs",
+}
+
+func (m *Playlist) getCurrent(ctx context.Context) (int64, app.Video) {
+	for {
+		id, video, err := m.playlistLogic.GetCurrent(ctx, m.stream.Id)
+		if err != nil {
+			log.FromContext(ctx).Error("get current video", "error", err)
+			select {
+			case <-ctx.Done():
+				return 0, app.Video{}
+			case <-time.After(time.Minute):
+				continue
+			}
+		}
+		return id, video
 	}
-	videos <- app.Video{
-		Id:  5,
-		Url: "https://www.youtube.com/watch?v=pmanD_s7G3U",
+}
+
+func (m *Playlist) getNext(ctx context.Context, id int64) (int64, app.Video) {
+	for {
+		nextId, video, err := m.playlistLogic.GetNext(ctx, id)
+		if err != nil {
+			log.FromContext(ctx).Error("get next video", "error", err)
+			select {
+			case <-ctx.Done():
+				return 0, app.Video{}
+			case <-time.After(time.Minute):
+				continue
+			}
+		}
+		return nextId, video
 	}
-	videos <- app.Video{
-		Id:  6,
-		Url: "https://www.youtube.com/watch?v=atxYe-nOa9w",
-	}
-	videos <- app.Video{
-		Id:  7,
-		Url: "https://www.youtube.com/watch?v=792vg0amsuQ",
-	}
-	videos <- app.Video{
-		Id:  8,
-		Url: "https://www.youtube.com/watch?v=_FDEH7hWb8c",
-	}
-	videos <- app.Video{
-		Id:  9,
-		Url: "https://www.youtube.com/watch?v=JdSpuTi9d8A",
-	}
-	videos <- app.Video{
-		Id:  10,
-		Url: "https://www.youtube.com/watch?v=EZKzXnq6ppk",
-	}
-	<-ctx.Done()
-	close(videos)
 }

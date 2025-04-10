@@ -1,2 +1,4 @@
-streaming_url: null
 videos_dir: "videos"
+pg:
+  dsn: "postgres://user:password@localhost:5432/tgstreamer?sslmode=disable"
+  drop_tables: false

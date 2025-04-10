@@ -2,7 +2,9 @@ package streamer
 
 import (
 	"context"
+	"sync"
 	"tgstreamer/internal/rpc"
+	"tgstreamer/lib/log"
 )
 
 type AdCutter struct {
@@ -18,11 +20,14 @@ func NewAdCutter(in chan piece, out chan piece) *AdCutter {
 	}
 }
 
-func (c *AdCutter) Run(ctx context.Context) {
-	go c.processingLoop(ctx)
+func (c *AdCutter) Run(ctx context.Context, wg *sync.WaitGroup) {
+	ctx = log.With(ctx, "worker", "ad_cutter")
+	wg.Add(1)
+	go c.processingLoop(ctx, wg)
 }
 
-func (c *AdCutter) processingLoop(ctx context.Context) {
+func (c *AdCutter) processingLoop(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
 	defer close(c.out)
 	for {
 		select {
@@ -36,7 +41,6 @@ func (c *AdCutter) processingLoop(ctx context.Context) {
 			case c.out <- c.processPiece(piece):
 			}
 		case <-ctx.Done():
-			close(c.out)
 			return
 		}
 	}

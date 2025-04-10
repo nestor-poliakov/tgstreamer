@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"os"
 	"tgstreamer/config"
+	"tgstreamer/lib/pg"
 
 	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	VideosDir    string `yaml:"videos_dir"`
-	StreamingUrl string `yaml:"streaming_url"`
+	VideosDir string    `yaml:"videos_dir"`
+	Pg        pg.Config `yaml:"pg"`
 }
 
 func ReadConfig() (conf Config) {

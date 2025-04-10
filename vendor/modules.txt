@@ -1,5 +1,33 @@
+# github.com/go-sql-driver/mysql v1.8.1
+## explicit; go 1.18
+# github.com/gocraft/dbr/v2 v2.7.7
+## explicit; go 1.21
+github.com/gocraft/dbr/v2
+github.com/gocraft/dbr/v2/dialect
+# github.com/golang-migrate/migrate/v4 v4.18.2
+## explicit; go 1.22.0
+github.com/golang-migrate/migrate/v4
+github.com/golang-migrate/migrate/v4/database
+github.com/golang-migrate/migrate/v4/database/multistmt
+github.com/golang-migrate/migrate/v4/database/postgres
+github.com/golang-migrate/migrate/v4/internal/url
+github.com/golang-migrate/migrate/v4/source
+github.com/golang-migrate/migrate/v4/source/iofs
+# github.com/hashicorp/errwrap v1.1.0
+## explicit
+github.com/hashicorp/errwrap
+# github.com/hashicorp/go-multierror v1.1.1
+## explicit; go 1.13
+github.com/hashicorp/go-multierror
+# github.com/jmoiron/sqlx v1.4.0
+## explicit; go 1.10
 # github.com/kr/pretty v0.3.1
 ## explicit; go 1.12
+# github.com/lib/pq v1.10.9
+## explicit; go 1.13
+github.com/lib/pq
+github.com/lib/pq/oid
+github.com/lib/pq/scram
 # github.com/nestor-poliakov/joy5 v0.0.0-20250406181521-54374d34636f
 ## explicit; go 1.24
 github.com/nestor-poliakov/joy5/av
@@ -17,6 +45,9 @@ github.com/nestor-poliakov/joy5/utils/bits/pio
 github.com/yapingcat/gomedia/go-codec
 github.com/yapingcat/gomedia/go-flv
 github.com/yapingcat/gomedia/go-mp4
+# go.uber.org/atomic v1.7.0
+## explicit; go 1.13
+go.uber.org/atomic
 # gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
 ## explicit; go 1.11
 # gopkg.in/yaml.v3 v3.0.1

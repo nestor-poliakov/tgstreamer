@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
+	"tgstreamer/internal/app"
+	"tgstreamer/internal/logic"
 	"tgstreamer/lib/log"
 
 	"github.com/nestor-poliakov/joy5/av"
@@ -12,25 +15,25 @@ import (
 )
 
 type Streamer struct {
-	url        string
-	client     *rtmp.Client
-	conn       *rtmp.Conn
-	nconn      net.Conn
-	rl         *rateLimiter
-	configs    []av.Packet
-	ch         <-chan piece
-	curVideoId int64
+	playlistLogic *logic.Playlist
+	url           string
+	client        *rtmp.Client
+	conn          *rtmp.Conn
+	nconn         net.Conn
+	rl            *rateLimiter
+	configs       []av.Packet
+	ch            <-chan piece
+	curVideoId    int64
 }
 
-func NewStreamer(streamingUrl string, ch <-chan piece) *Streamer {
-	client := rtmp.NewClient()
-
+func NewStreamer(ch <-chan piece, stream app.Stream, playlistLogic *logic.Playlist) *Streamer {
 	return &Streamer{
-		url:     streamingUrl,
-		client:  client,
-		ch:      ch,
-		rl:      newRateLimiter(),
-		configs: make([]av.Packet, 0, 3),
+		playlistLogic: playlistLogic,
+		url:           stream.Settings.Url,
+		client:        rtmp.NewClient(),
+		ch:            ch,
+		rl:            newRateLimiter(),
+		configs:       make([]av.Packet, 0, 3),
 	}
 }
 
@@ -49,17 +52,19 @@ func (s *Streamer) reconnect() (err error) {
 	return nil
 }
 
-func (s *Streamer) Run(ctx context.Context) error {
+func (s *Streamer) Run(ctx context.Context, wg *sync.WaitGroup) error {
 	ctx = log.With(ctx, "worker", "streamer")
 	err := s.reconnect()
 	if err != nil {
 		return err
 	}
-	go s.streamingLoop(ctx)
+	wg.Add(1)
+	go s.streamingLoop(ctx, wg)
 	return nil
 }
 
-func (s *Streamer) streamingLoop(ctx context.Context) {
+func (s *Streamer) streamingLoop(ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
 	defer log.FromContext(ctx).Info("streaming ended; closing connection")
 	defer s.nconn.Close()
 
@@ -73,6 +78,7 @@ func (s *Streamer) streamingLoop(ctx context.Context) {
 				return
 			}
 			if piece.videoId != s.curVideoId {
+				s.playlistLogic.SetCurrent(piece.videoId)
 				s.rl = newRateLimiter()
 				s.configs = s.configs[:0]
 				s.curVideoId = piece.videoId

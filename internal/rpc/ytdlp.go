@@ -3,27 +3,37 @@ package rpc
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path"
 	"strings"
 	"time"
 
+	"tgstreamer/internal/app"
+	"tgstreamer/internal/logic"
 	"tgstreamer/lib/log"
 )
 
 type YtDlpClient struct {
-	filesDir string
+	videoLogic *logic.Video
+	filesDir   string
 }
 
-func NewYtDlpClient(filesDir string) *YtDlpClient {
+func NewYtDlpClient(videoLogic *logic.Video, filesDir string) *YtDlpClient {
 	y := &YtDlpClient{
-		filesDir: filesDir,
+		videoLogic: videoLogic,
+		filesDir:   filesDir,
 	}
 	return y
 }
 
-func (y *YtDlpClient) Download(ctx context.Context, videoUrl string) (string, error) {
+func (y *YtDlpClient) DownloadYt(ctx context.Context, video app.Video) (string, error) {
+	return y.Download(ctx, video.Id, "https://www.youtube.com/watch?"+url.Values{"v": {video.Code}}.Encode())
+}
+
+func (y *YtDlpClient) Download(ctx context.Context, videoId int64, videoUrl string) (string, error) {
+	log.FromContexts(ctx).Info("start downloading video " + videoUrl)
 	fileName := y.makeFileName(videoUrl)
 	_, err := os.Stat(fileName)
 	if err == nil {
@@ -43,6 +53,7 @@ func (y *YtDlpClient) Download(ctx context.Context, videoUrl string) (string, er
 	if err != nil {
 		return "", fmt.Errorf("stat file %q: %w", fileName, err)
 	}
+	y.videoLogic.SetDownloaded(videoId, fileName)
 	log.FromContexts(ctx).Infof("%dMB downloaded for %s", info.Size()/1024/1024, time.Since(t))
 	return fileName, nil
 }
