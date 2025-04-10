@@ -4,7 +4,6 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
-	"time"
 )
 
 type Video struct {
@@ -21,7 +20,7 @@ type YoutubeInfo struct {
 	PublishedAt int64
 	Thumbnail   string
 	Title       string
-	Duration    time.Duration
+	Duration    int64
 }
 
 func (y *YoutubeInfo) Scan(v any) error {
@@ -34,7 +33,11 @@ func (y *YoutubeInfo) Scan(v any) error {
 }
 
 func (y YoutubeInfo) Value() (driver.Value, error) {
-	return json.Marshal(y)
+	if y.Duration == 0 && y.Thumbnail == "" && y.Title == "" && y.PublishedAt == 0 {
+		return string("{}"), nil
+	}
+	b, err := json.Marshal(y)
+	return string(b), err
 }
 
 type SponsorBlockInfo struct {

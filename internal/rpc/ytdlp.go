@@ -11,19 +11,22 @@ import (
 	"time"
 
 	"tgstreamer/internal/app"
-	"tgstreamer/internal/logic"
 	"tgstreamer/lib/log"
 )
 
-type YtDlpClient struct {
-	videoLogic *logic.Video
-	filesDir   string
+type DownloadedSetter interface {
+	SetDownloaded(id int64, fileName string)
 }
 
-func NewYtDlpClient(videoLogic *logic.Video, filesDir string) *YtDlpClient {
+type YtDlpClient struct {
+	setter   DownloadedSetter
+	filesDir string
+}
+
+func NewYtDlpClient(setter DownloadedSetter, filesDir string) *YtDlpClient {
 	y := &YtDlpClient{
-		videoLogic: videoLogic,
-		filesDir:   filesDir,
+		setter:   setter,
+		filesDir: filesDir,
 	}
 	return y
 }
@@ -53,7 +56,7 @@ func (y *YtDlpClient) Download(ctx context.Context, videoId int64, videoUrl stri
 	if err != nil {
 		return "", fmt.Errorf("stat file %q: %w", fileName, err)
 	}
-	y.videoLogic.SetDownloaded(videoId, fileName)
+	y.setter.SetDownloaded(videoId, fileName)
 	log.FromContexts(ctx).Infof("%dMB downloaded for %s", info.Size()/1024/1024, time.Since(t))
 	return fileName, nil
 }

@@ -11,8 +11,9 @@ import (
 )
 
 type Config struct {
-	VideosDir string    `yaml:"videos_dir"`
-	Pg        pg.Config `yaml:"pg"`
+	VideosDir     string    `yaml:"videos_dir"`
+	YoutubeApiKey string    `yaml:"youtube_api_key"`
+	Pg            pg.Config `yaml:"pg"`
 }
 
 func ReadConfig() (conf Config) {
