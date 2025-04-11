@@ -41,7 +41,8 @@ func (y YoutubeInfo) Value() (driver.Value, error) {
 }
 
 type SponsorBlockInfo struct {
-	Segments []Segment
+	LoadedAt int64     `json:"loadedAt"`
+	Segments []Segment `json:"segments"`
 }
 
 type Segment struct {
@@ -65,5 +66,6 @@ func (y *SponsorBlockInfo) Scan(v any) error {
 }
 
 func (y SponsorBlockInfo) Value() (driver.Value, error) {
-	return json.Marshal(y)
+	b, err := json.Marshal(y)
+	return string(b), err
 }

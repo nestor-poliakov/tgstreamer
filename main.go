@@ -32,12 +32,13 @@ func main() {
 		playlistPg = postgres.NewPlaylist()
 	)
 	var (
-		youtube = rpc.NewYoutube(stopContext, conf.YoutubeApiKey)
+		youtube      = rpc.NewYoutube(stopContext, conf.YoutubeApiKey)
+		sponsorBlock = rpc.NewSponsorBlock()
 	)
 
 	var (
 		playlistLogic = logic.NewPlaylist(playlistPg, videoPg)
-		videoLogic    = logic.NewVideo(videoPg, youtube)
+		videoLogic    = logic.NewVideo(videoPg, youtube, sponsorBlock)
 	)
 	var (
 		ytdlp = rpc.NewYtDlpClient(videoLogic, conf.VideosDir)

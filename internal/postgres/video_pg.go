@@ -48,6 +48,14 @@ func (Video) GetNoYtInfo(ctx context.Context) (video app.Video, err error) {
 	return video, pg.FromContext(ctx).Query(sql).LoadOneContext(ctx, &video)
 }
 
+func (Video) GetNoSbInfo(ctx context.Context) (video app.Video, err error) {
+	sql := `select id, code, created_at, downloaded_at, file_name, yt_info
+			from video
+			where sb_info = '{}'
+			limit 1`
+	return video, pg.FromContext(ctx).Query(sql).LoadOneContext(ctx, &video)
+}
+
 func (Video) Create(ctx context.Context, video app.Video) (res app.Video, err error) {
 	sql := `insert into video(code)
 	values (?)

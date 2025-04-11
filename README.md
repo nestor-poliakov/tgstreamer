@@ -8,6 +8,7 @@ Infinite stream to telegram channel with videos from YouTube
 - [x] download videos before streaming
 - [x] stream videos from playlist in db
 - [x] download video title and cover
+- [x] download segments from SponsorBlock
 - [ ] cut ad using data from SponsorBlock
 - [ ] send video cover to channel when it starts
 - [ ] run multiple streams simultaneously

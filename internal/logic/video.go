@@ -14,15 +14,17 @@ import (
 
 type Video struct {
 	youtube         *rpc.Youtube
+	sb              *rpc.SponsorBlockClient
 	videoStorage    postgres.Video
 	toSetDownloaded chan downloaded
 	wg              *sync.WaitGroup
 	stopFunc        func()
 }
 
-func NewVideo(videoStorage postgres.Video, youtube *rpc.Youtube) *Video {
+func NewVideo(videoStorage postgres.Video, youtube *rpc.Youtube, sb *rpc.SponsorBlockClient) *Video {
 	return &Video{
 		youtube:         youtube,
+		sb:              sb,
 		videoStorage:    videoStorage,
 		toSetDownloaded: make(chan downloaded, 10),
 		wg:              &sync.WaitGroup{},
@@ -31,12 +33,13 @@ func NewVideo(videoStorage postgres.Video, youtube *rpc.Youtube) *Video {
 }
 
 func (v *Video) Run(ctx context.Context) {
-	ctx = log.With(ctx, "worker", "video")
 	ctx, v.stopFunc = context.WithCancel(ctx)
 	v.wg.Add(1)
-	go v.settingDownloadedLoop(ctx)
+	go v.settingDownloadedLoop(log.With(ctx, "worker", "video"))
 	v.wg.Add(1)
-	go v.gettingYtInfoLoop(ctx)
+	go v.gettingYtInfoLoop(log.With(ctx, "worker", "yt_info_downloader"))
+	v.wg.Add(1)
+	go v.gettingSbInfoLoop(log.With(ctx, "worker", "sb_info_downloader"))
 }
 
 func (v *Video) Stop() {
@@ -103,5 +106,43 @@ func (v *Video) getYtInfo(ctx context.Context) error {
 		return fmt.Errorf("add youtube info: %w", err)
 	}
 	log.FromContexts(ctx).Infof("youtube info for video %d saved", video.Id)
+	return nil
+}
+
+func (v *Video) gettingSbInfoLoop(ctx context.Context) {
+	defer v.wg.Done()
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			err := v.getSbInfo(ctx)
+			if err != nil {
+				log.FromContext(ctx).Error("get sb info", "error", err)
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (v *Video) getSbInfo(ctx context.Context) error {
+	video, err := v.videoStorage.GetNoSbInfo(ctx)
+	if errors.Is(err, pg.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("get video without sponsor block info: %w", err)
+	}
+	video.SbInfo.Segments, err = v.sb.GetSegments(ctx, video.Code)
+	if err != nil {
+		return fmt.Errorf("get sponsor block info: %w", err)
+	}
+	video.SbInfo.LoadedAt = time.Now().Unix()
+	err = v.videoStorage.AddSponsorBlockInfo(ctx, video.Id, video.SbInfo)
+	if err != nil {
+		return fmt.Errorf("add sponsor block info: %w", err)
+	}
+	log.FromContexts(ctx).Infof("sponsor block info for video %d saved", video.Id)
 	return nil
 }

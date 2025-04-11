@@ -25,15 +25,7 @@ func NewSponsorBlock() *SponsorBlockClient {
 	return sb
 }
 
-func (s *SponsorBlockClient) GetSegments(ctx context.Context, videoUrl string) (segments []app.Segment, err error) {
-	u, err := url.Parse(videoUrl)
-	if err != nil {
-		return nil, fmt.Errorf("parse video url: %w", err)
-	}
-	id := u.Query().Get("v")
-	if id == "" {
-		return nil, fmt.Errorf("video id not found in url")
-	}
+func (s *SponsorBlockClient) GetSegments(ctx context.Context, videoCode string) (segments []app.Segment, err error) {
 	req := http.Request{
 		Method: "GET",
 		URL: &url.URL{
@@ -41,7 +33,7 @@ func (s *SponsorBlockClient) GetSegments(ctx context.Context, videoUrl string) (
 			Host:   host,
 			Path:   "/api/skipSegments",
 			RawQuery: url.Values{
-				"videoID": []string{id},
+				"videoID": []string{videoCode},
 			}.Encode(),
 		},
 	}
