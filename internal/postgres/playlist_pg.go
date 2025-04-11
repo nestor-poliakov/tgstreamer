@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 
+	"tgstreamer/internal/app"
 	"tgstreamer/lib/pg"
 )
 
@@ -34,35 +35,26 @@ func (Playlist) SetCurrent(ctx context.Context, id int64) error {
 	return pg.FromContext(ctx).Query(sql, id, id, id).ExecContext(ctx)
 }
 
-func (Playlist) GetStreamId(ctx context.Context, pliId int64) (streamId int64, err error) {
-	sql := `select stream_id from playlist_item where id = ?`
-	return streamId, pg.FromContext(ctx).Query(sql, pliId).LoadOneContext(ctx, &streamId)
+func (Playlist) Get(ctx context.Context, id int64) (res app.PlaylistItem, err error) {
+	sql := `select id, video_id, stream_id from playlist_item where id = ?`
+	return res, pg.FromContext(ctx).Query(sql, id).LoadOneContext(ctx, &res)
+}
+func (Playlist) GetCurrent(ctx context.Context, streamId int64) (res app.PlaylistItem, err error) {
+	sql := `select id, video_id, stream_id from playlist_item where stream_id = ? and is_current = true`
+	return res, pg.FromContext(ctx).Query(sql, streamId).LoadOneContext(ctx, &res)
 }
 
-func (Playlist) GetCurrent(ctx context.Context, streamId int64) (pliId int64, videoId int64, err error) {
-	p := playlistItem{}
-	sql := `select id, video_id from playlist_item where stream_id = ? and is_current = true`
-	return p.Id, p.VideoId, pg.FromContext(ctx).Query(sql, streamId).LoadOneContext(ctx, &p)
-}
-
-func (Playlist) GetNext(ctx context.Context, playlistItemId int64) (pliId int64, videoId int64, err error) {
-	p := playlistItem{}
-	sql := `select id, video_id
+func (Playlist) GetNext(ctx context.Context, playlistItemId int64) (res app.PlaylistItem, err error) {
+	sql := `select id, video_id, stream_id
 			from playlist_item
 			where stream_id = (select stream_id FROM playlist_item where id = ?)
 			and id > ?
 			order by id asc
 			limit 1;`
-	return p.Id, p.VideoId, pg.FromContext(ctx).Query(sql, playlistItemId, playlistItemId).LoadOneContext(ctx, &p)
+	return res, pg.FromContext(ctx).Query(sql, playlistItemId, playlistItemId).LoadOneContext(ctx, &res)
 }
 
-func (Playlist) GetFirst(ctx context.Context, streamId int64) (pliId int64, videoId int64, err error) {
-	p := playlistItem{}
-	sql := `select id, video_id from playlist_item where stream_id = ? order by id asc limit 1`
-	return p.Id, p.VideoId, pg.FromContext(ctx).Query(sql, streamId).LoadOneContext(ctx, &p)
-}
-
-type playlistItem struct {
-	Id      int64 `db:"id"`
-	VideoId int64 `db:"video_id"`
+func (Playlist) GetFirst(ctx context.Context, streamId int64) (res app.PlaylistItem, err error) {
+	sql := `select id, video_id, stream_id from playlist_item where stream_id = ? order by id asc limit 1`
+	return res, pg.FromContext(ctx).Query(sql, streamId).LoadOneContext(ctx, &res)
 }

@@ -69,3 +69,9 @@ func (y SponsorBlockInfo) Value() (driver.Value, error) {
 	b, err := json.Marshal(y)
 	return string(b), err
 }
+
+type PlaylistItem struct {
+	Id       int64
+	VideoId  int64
+	StreamId int64
+}

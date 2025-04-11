@@ -14,7 +14,8 @@ type Stream struct {
 }
 
 type Settings struct {
-	Url string `json:"url"`
+	Url         string `json:"url"`
+	TgChannelId int64  `json:"tg_channel_id"`
 }
 
 func (y *Settings) Scan(v any) error {
@@ -27,5 +28,6 @@ func (y *Settings) Scan(v any) error {
 }
 
 func (y Settings) Value() (driver.Value, error) {
-	return json.Marshal(y)
+	b, err := json.Marshal(y)
+	return string(b), err
 }

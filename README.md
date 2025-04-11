@@ -11,9 +11,9 @@ Infinite stream to telegram channel with videos from YouTube
 - [x] download video title and cover
 - [x] download segments from SponsorBlock
 - [x] delete files after streaming
+- [x] send video cover to channel when it starts
 - [ ] cut ad using data from SponsorBlock
 - [ ] predownloading videos before streaming pipeline
-- [ ] send video cover to channel when it starts
 - [ ] better video quality by downloading video and audio separately and read them simultaneously
 - [ ] make video playlist automatically with new videos by list of youtube channels
 - [ ] receive suggestions about new videos

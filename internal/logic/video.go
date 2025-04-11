@@ -97,14 +97,16 @@ func (v *Video) gettingYtInfoLoop(ctx context.Context) {
 	defer v.wg.Done()
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
-	select {
-	case <-ticker.C:
-		err := v.getYtInfo(ctx)
-		if err != nil {
-			log.FromContext(ctx).Error("get yt info", "error", err)
+	for {
+		select {
+		case <-ticker.C:
+			err := v.getYtInfo(ctx)
+			if err != nil {
+				log.FromContext(ctx).Error("get yt info", "error", err)
+			}
+		case <-ctx.Done():
+			return
 		}
-	case <-ctx.Done():
-		return
 	}
 }
 

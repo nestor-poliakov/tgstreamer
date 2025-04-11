@@ -1,5 +1,6 @@
 videos_dir: "videos"
 youtube_api_key: ""
+tg_bot_token: ""
 pg:
   dsn: "postgres://user:password@localhost:5432/tgstreamer?sslmode=disable"
   drop_tables: false

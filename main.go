@@ -30,6 +30,7 @@ func main() {
 		ytdlp        = rpc.NewYtDlpClient(conf.VideosDir)
 		youtube      = rpc.NewYoutube(stopContext, conf.YoutubeApiKey)
 		sponsorBlock = rpc.NewSponsorBlock()
+		tg           = rpc.NewTelegram(conf.TgBotToken)
 	)
 
 	var (
@@ -39,11 +40,11 @@ func main() {
 	)
 
 	var (
-		playlistLogic = logic.NewPlaylist(playlistPg, videoPg)
+		playlistLogic = logic.NewPlaylist(playlistPg, videoPg, streamPg, tg)
 		videoLogic    = logic.NewVideo(videoPg, youtube, ytdlp, sponsorBlock)
 	)
 
-	manager := streamer.NewManager(playlistLogic, videoLogic, *streamPg, ytdlp)
+	manager := streamer.NewManager(playlistLogic, videoLogic, streamPg, ytdlp)
 	fillDb(ctx)
 	manager.Run(ctx)
 	playlistLogic.Run(ctx)

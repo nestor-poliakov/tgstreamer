@@ -14,6 +14,7 @@ type Config struct {
 	VideosDir     string    `yaml:"videos_dir"`
 	YoutubeApiKey string    `yaml:"youtube_api_key"`
 	Pg            pg.Config `yaml:"pg"`
+	TgBotToken    string    `yaml:"tg_bot_token"`
 }
 
 func ReadConfig() (conf Config) {
