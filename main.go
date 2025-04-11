@@ -27,24 +27,23 @@ func main() {
 	ctx = pg.NewContext(ctx, pgConn)
 
 	var (
-		streamPg   = postgres.NewStream()
-		videoPg    = postgres.NewVideo()
-		playlistPg = postgres.NewPlaylist()
-	)
-	var (
+		ytdlp        = rpc.NewYtDlpClient(conf.VideosDir)
 		youtube      = rpc.NewYoutube(stopContext, conf.YoutubeApiKey)
 		sponsorBlock = rpc.NewSponsorBlock()
 	)
 
 	var (
-		playlistLogic = logic.NewPlaylist(playlistPg, videoPg)
-		videoLogic    = logic.NewVideo(videoPg, youtube, sponsorBlock)
-	)
-	var (
-		ytdlp = rpc.NewYtDlpClient(videoLogic, conf.VideosDir)
+		streamPg   = postgres.NewStream()
+		videoPg    = postgres.NewVideo()
+		playlistPg = postgres.NewPlaylist()
 	)
 
-	manager := streamer.NewManager(playlistLogic, *streamPg, ytdlp)
+	var (
+		playlistLogic = logic.NewPlaylist(playlistPg, videoPg)
+		videoLogic    = logic.NewVideo(videoPg, youtube, ytdlp, sponsorBlock)
+	)
+
+	manager := streamer.NewManager(playlistLogic, videoLogic, *streamPg, ytdlp)
 	fillDb(ctx)
 	manager.Run(ctx)
 	playlistLogic.Run(ctx)

@@ -16,15 +16,17 @@ type Manager struct {
 	streams       map[int64]*stream
 	downloader    *rpc.YtDlpClient
 	playlistLogic *logic.Playlist
+	videoLogic    *logic.Video
 	streamStorage postgres.Stream
 	wg            *sync.WaitGroup
 	stopFunc      func()
 }
 
-func NewManager(playlistLogic *logic.Playlist, streamStorage postgres.Stream, downloader *rpc.YtDlpClient) *Manager {
+func NewManager(playlistLogic *logic.Playlist, videoLogic *logic.Video, streamStorage postgres.Stream, downloader *rpc.YtDlpClient) *Manager {
 	m := &Manager{
 		streams:       make(map[int64]*stream),
 		playlistLogic: playlistLogic,
+		videoLogic:    videoLogic,
 		streamStorage: streamStorage,
 		downloader:    downloader,
 		wg:            &sync.WaitGroup{},
@@ -69,6 +71,7 @@ func (m *Manager) processingLoop(ctx context.Context) {
 }
 
 func (m *Manager) updateStreams(ctx context.Context) error {
+	log.FromContext(ctx)
 	streams, err := m.streamStorage.GetActive(ctx)
 	if err != nil {
 		return fmt.Errorf("get all streams: %w", err)
@@ -96,7 +99,7 @@ func (m *Manager) runStream(ctx context.Context, strm app.Stream) {
 	s := &stream{
 		stream:   strm,
 		playlist: NewPlaylist(toReader, strm, m.playlistLogic),
-		reader:   NewReader(toReader, toAdCutter, m.downloader),
+		reader:   NewReader(toReader, toAdCutter, m.downloader, m.videoLogic),
 		adCutter: NewAdCutter(toAdCutter, toStreamer),
 		streamer: NewStreamer(toStreamer, strm, m.playlistLogic),
 		wg:       &sync.WaitGroup{},

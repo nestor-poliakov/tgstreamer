@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"tgstreamer/internal/app"
+	"tgstreamer/internal/logic"
 	"tgstreamer/internal/rpc"
 	"tgstreamer/lib/log"
 
@@ -26,13 +27,15 @@ type Reader struct {
 	videos     <-chan app.Video
 	ch         chan<- piece
 	downloader *rpc.YtDlpClient
+	videoLogic *logic.Video
 }
 
-func NewReader(videos <-chan app.Video, ch chan<- piece, downloader *rpc.YtDlpClient) *Reader {
+func NewReader(videos <-chan app.Video, ch chan<- piece, downloader *rpc.YtDlpClient, videoLogic *logic.Video) *Reader {
 	return &Reader{
 		videos:     videos,
 		ch:         ch,
 		downloader: downloader,
+		videoLogic: videoLogic,
 	}
 }
 
@@ -65,13 +68,11 @@ func (r *Reader) readingLoop(ctx context.Context, wg *sync.WaitGroup) {
 }
 
 func (r *Reader) processVideo(ctx context.Context, video app.Video) (err error) {
-	if video.FileName == "" {
-
-		video.FileName, err = r.downloader.DownloadYt(ctx, video)
-		if err != nil {
-			return fmt.Errorf("download video: %w", err)
-		}
+	video.FileName, err = r.downloader.DownloadYt(ctx, video.Code)
+	if err != nil {
+		return fmt.Errorf("download video: %w", err)
 	}
+	r.videoLogic.SetDownloaded(video.Id, video.FileName)
 	log.FromContexts(ctx).Infof("start reading new video %q", video.FileName)
 	var reader io.ReadCloser
 	var m flvio.AMFMap

@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"tgstreamer/internal/app"
@@ -62,4 +63,25 @@ func (Video) Create(ctx context.Context, video app.Video) (res app.Video, err er
 	on conflict (code) do update set code = excluded.code
 	returning id, code, created_at`
 	return res, pg.FromContext(ctx).Query(sql, video.Code).LoadOneContext(ctx, &res)
+}
+
+func (Video) DeleteFileNames(ctx context.Context, fileNames []string) error {
+	vals := make([]any, len(fileNames))
+	for i := range fileNames {
+		vals[i] = fileNames[i]
+	}
+	sql := `update video set (file_name,downloaded_at) = ('',0) where file_name in (` + questions(len(fileNames)) + `)`
+	return pg.FromContext(ctx).Query(sql, vals...).ExecContext(ctx)
+}
+
+func questions(n int) string {
+	if n < 1 {
+		return ""
+	}
+	var builder strings.Builder
+	builder.WriteByte('?')
+	for i := 0; i < n-1; i++ {
+		builder.WriteString(",?")
+	}
+	return builder.String()
 }
