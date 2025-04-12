@@ -76,6 +76,7 @@ func (m *Manager) updateStreams(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get all streams: %w", err)
 	}
+	fmt.Println("streams:", streams)
 	streamsMap := map[int64]bool{}
 	for _, stream := range streams {
 		streamsMap[stream.Id] = true

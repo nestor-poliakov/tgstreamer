@@ -1,0 +1,121 @@
+package logic
+
+import (
+	"context"
+	"fmt"
+	"sync"
+	"tgstreamer/internal/app"
+	"tgstreamer/internal/postgres"
+	"tgstreamer/internal/rpc"
+	"tgstreamer/lib/log"
+	"time"
+)
+
+type StreamLogic struct {
+	streamStorage   postgres.Stream
+	videoStorage    postgres.Video
+	playlistStorage postgres.Playlist
+	youtube         *rpc.Youtube
+	wg              *sync.WaitGroup
+	stopFunc        context.CancelFunc
+}
+
+func NewStream(streamStorage postgres.Stream, videoStorage postgres.Video, playlistStorage postgres.Playlist, youtube *rpc.Youtube) *StreamLogic {
+	return &StreamLogic{
+		streamStorage:   streamStorage,
+		videoStorage:    videoStorage,
+		playlistStorage: playlistStorage,
+		youtube:         youtube,
+		wg:              &sync.WaitGroup{},
+		stopFunc:        func() {},
+	}
+}
+
+func (s *StreamLogic) Run(ctx context.Context) {
+	ctx, s.stopFunc = context.WithCancel(ctx)
+	s.wg.Add(1)
+	go s.playlistUpdateLoop(log.With(ctx, "worker", "playlist_updater"))
+}
+
+func (s *StreamLogic) Stop() {
+	s.stopFunc()
+	s.wg.Wait()
+}
+
+func (s *StreamLogic) playlistUpdateLoop(ctx context.Context) {
+	defer s.wg.Done()
+	t := time.NewTicker(time.Hour * 10)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			err := s.updatePlaylistsInfo(ctx)
+			if err != nil {
+				log.FromContext(ctx).Error("update playlist info", "error", err)
+			}
+		}
+	}
+}
+
+func (s *StreamLogic) updatePlaylistsInfo(ctx context.Context) error {
+	streams, err := s.streamStorage.GetActive(ctx)
+	if err != nil {
+		return fmt.Errorf("get active streams: %w", err)
+	}
+	for _, stream := range streams {
+		ctx := log.With(ctx, "stream_id", stream.Id)
+		err := s.updatePlaylistInfo(ctx, stream)
+		if err != nil {
+			return fmt.Errorf("update playlist info: %w", err)
+		}
+		time.Sleep(time.Second)
+	}
+	return nil
+}
+
+func (s *StreamLogic) updatePlaylistInfo(ctx context.Context, stream app.Stream) (err error) {
+	if stream.Type != app.StreamTypePlaylist {
+		log.FromContext(ctx).Info("nothing to update")
+		return nil
+	}
+	if stream.Settings.PlaylistCode == "" {
+		return fmt.Errorf("playlist code is empty")
+	}
+	videos, err := s.youtube.GetPlaylist(ctx, stream.Settings.PlaylistCode)
+	if err != nil {
+		return fmt.Errorf("get playlist items from youtube: %w", err)
+	}
+	log.FromContexts(ctx).Infof("%d videos found in youtube playlist", len(videos))
+	videos, err = s.videoStorage.CreateList(ctx, videos)
+	if err != nil {
+		return fmt.Errorf("create videos: %w", err)
+	}
+	curPlaylist, err := s.playlistStorage.GetForStream(ctx, stream.Id)
+	if err != nil {
+		return fmt.Errorf("get playlist for stream: %w", err)
+	}
+	itemsToCreate := s.makeItemsNotInPlaylist(curPlaylist, videos)
+	log.FromContexts(ctx).Infof("%d items to add to playlist", len(itemsToCreate))
+	err = s.playlistStorage.CreateList(ctx, itemsToCreate, stream.Id)
+	if err != nil {
+		return fmt.Errorf("add videos to playlist: %w", err)
+	}
+	return nil
+}
+
+func (s *StreamLogic) makeItemsNotInPlaylist(playlist []app.PlaylistItem, videos []app.Video) (res []int64) {
+	playlistMap := make(map[int64]bool, len(playlist))
+	for _, item := range playlist {
+		playlistMap[item.VideoId] = true
+	}
+
+	for _, video := range videos {
+		_, ok := playlistMap[video.Id]
+		if !ok {
+			res = append(res, video.Id)
+		}
+	}
+	return res
+}

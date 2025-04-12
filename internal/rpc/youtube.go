@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"tgstreamer/internal/app"
+	"tgstreamer/lib/log"
 	"time"
 
 	"google.golang.org/api/option"
@@ -27,38 +28,74 @@ func NewYoutube(ctx context.Context, apiKey string) *Youtube {
 	return y
 }
 
-func (y *Youtube) GetInfo(ctx context.Context, youtubeVideoId string) (app.YoutubeInfo, error) {
-	resp, err := y.service.Videos.List([]string{"snippet,contentDetails,statistics"}).Id(youtubeVideoId).Do()
+func (y *Youtube) GetInfo(ctx context.Context, youtubeVideoIds []string) (res []app.YoutubeInfo, err error) {
+	if len(youtubeVideoIds) > 50 {
+		return nil, fmt.Errorf("too many videos to process")
+	}
+	resp, err := y.service.Videos.List([]string{"snippet,contentDetails,statistics"}).Id(youtubeVideoIds...).Do()
 	if err != nil {
-		return app.YoutubeInfo{}, fmt.Errorf("get info: %w", err)
+		return nil, fmt.Errorf("get info: %w", err)
 	}
-	if len(resp.Items) == 0 {
-		return app.YoutubeInfo{}, fmt.Errorf("no items in response")
-	}
-	v := resp.Items[0]
-	publishedAt, err := time.Parse(time.RFC3339, v.Snippet.PublishedAt)
-	if err != nil {
-		return app.YoutubeInfo{}, fmt.Errorf("parse published at: %w", err)
-	}
-	var thumbnail = &youtube.Thumbnail{}
-	for _, tn := range []*youtube.Thumbnail{
-		v.Snippet.Thumbnails.Maxres,
-		v.Snippet.Thumbnails.High,
-		v.Snippet.Thumbnails.Medium,
-		v.Snippet.Thumbnails.Standard,
-		v.Snippet.Thumbnails.Default,
-	} {
-		if tn != nil {
-			thumbnail = tn
-			break
+	resMap := make(map[string]app.YoutubeInfo, len(resp.Items))
+	for _, v := range resp.Items {
+		publishedAt, _ := time.Parse(time.RFC3339, v.Snippet.PublishedAt)
+		resMap[v.Id] = app.YoutubeInfo{
+			PublishedAt: publishedAt.Unix(),
+			Thumbnail:   y.getThumbnailUrl(*v.Snippet.Thumbnails),
+			Title:       v.Snippet.Title,
+			Duration:    y.parseDuration(v.ContentDetails.Duration),
 		}
 	}
-	return app.YoutubeInfo{
-		PublishedAt: publishedAt.Unix(),
-		Thumbnail:   thumbnail.Url,
-		Title:       v.Snippet.Title,
-		Duration:    y.parseDuration(v.ContentDetails.Duration),
-	}, nil
+	for _, id := range youtubeVideoIds {
+		info := resMap[id]
+		info.LoadedAt = time.Now().Unix()
+		res = append(res, info)
+	}
+	return res, nil
+}
+
+func (y *Youtube) GetPlaylist(ctx context.Context, playlistId string) (videos []app.Video, err error) {
+	pageToken := "0"
+	for pageToken != "" {
+		call := y.service.PlaylistItems.List([]string{"snippet,contentDetails"}).
+			PlaylistId(playlistId).
+			MaxResults(50)
+		if pageToken != "" && pageToken != "0" {
+			call = call.PageToken(pageToken)
+		}
+		resp, err := call.Do()
+		if err != nil {
+			log.FromContext(ctx).Error("do request", "error", err)
+			break
+		}
+		// b, _ := json.MarshalIndent(resp, "", "  ")
+		// fmt.Println("resp:", string(b))
+		// os.Exit(0)
+		pageToken = resp.NextPageToken
+		videos = append(videos, y.toVideoCodes(resp.Items)...)
+	}
+	return videos, nil
+}
+
+func (y *Youtube) toVideoCodes(items []*youtube.PlaylistItem) []app.Video {
+	res := make([]app.Video, 0, len(items))
+	for _, item := range items {
+		if item.Snippet.Description == "This video is unavailable." &&
+			item.Snippet.Title == "Deleted video" {
+			continue
+		}
+		publishedAt, _ := time.Parse(time.RFC3339, item.Snippet.PublishedAt)
+		res = append(res, app.Video{
+			Code: item.ContentDetails.VideoId,
+			YtInfo: app.YoutubeInfo{
+				LoadedAt:    time.Now().Unix(),
+				PublishedAt: publishedAt.Unix(),
+				Thumbnail:   y.getThumbnailUrl(*item.Snippet.Thumbnails),
+				Title:       item.Snippet.Title,
+			},
+		})
+	}
+	return res
 }
 
 func (y *Youtube) parseDuration(str string) int64 {
@@ -85,4 +122,23 @@ func (y *Youtube) parseDuration(str string) int64 {
 		dur += time.Second * time.Duration(secs)
 	}
 	return int64(dur.Seconds())
+}
+
+func (y *Youtube) getThumbnailUrl(td youtube.ThumbnailDetails) string {
+	if td.Maxres != nil {
+		return td.Maxres.Url
+	}
+	if td.High != nil {
+		return td.High.Url
+	}
+	if td.Medium != nil {
+		return td.Medium.Url
+	}
+	if td.Standard != nil {
+		return td.Standard.Url
+	}
+	if td.Default != nil {
+		return td.Default.Url
+	}
+	return ""
 }

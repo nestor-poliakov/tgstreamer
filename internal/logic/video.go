@@ -111,22 +111,29 @@ func (v *Video) gettingYtInfoLoop(ctx context.Context) {
 }
 
 func (v *Video) getYtInfo(ctx context.Context) error {
-	video, err := v.videoStorage.GetNoYtInfo(ctx)
-	if errors.Is(err, pg.ErrNoRows) {
-		return nil
-	}
+	videos, err := v.videoStorage.GetNoYtInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("get video without youtube info: %w", err)
 	}
-	video.YtInfo, err = v.youtube.GetInfo(ctx, video.Code)
+	if len(videos) == 0 {
+		return nil
+	}
+	codes := make([]string, len(videos))
+	for i := range videos {
+		codes[i] = videos[i].Code
+	}
+	infos, err := v.youtube.GetInfo(ctx, codes)
 	if err != nil {
 		return fmt.Errorf("get youtube info: %w", err)
 	}
-	err = v.videoStorage.AddYoutubeInfo(ctx, video.Id, video.YtInfo)
+	for i := range videos {
+		videos[i].YtInfo = infos[i]
+	}
+	err = v.videoStorage.AddYoutubeInfos(ctx, videos)
 	if err != nil {
 		return fmt.Errorf("add youtube info: %w", err)
 	}
-	log.FromContexts(ctx).Infof("youtube info for video %d saved", video.Id)
+	log.FromContexts(ctx).Infof("youtube info for %d videos saved", len(videos))
 	return nil
 }
 

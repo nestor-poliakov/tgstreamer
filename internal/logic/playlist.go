@@ -85,7 +85,7 @@ func (p *Playlist) setCurrent(ctx context.Context, id int64) error {
 
 	err = p.tg.Announce(ctx, stream.Settings.TgChannelId, video)
 	if err != nil {
-		return fmt.Errorf("announce new video to tg channel: %w", err)
+		return fmt.Errorf("announce new video %d to tg channel %d: %w", video.Id, stream.Settings.TgChannelId, err)
 	}
 	return nil
 }

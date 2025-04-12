@@ -17,10 +17,12 @@ type Video struct {
 }
 
 type YoutubeInfo struct {
-	PublishedAt int64
-	Thumbnail   string
-	Title       string
-	Duration    int64
+	LoadedAt    int64  `json:"loaded_at,omitempty"`
+	PublishedAt int64  `json:"published_at,omitempty"`
+	Thumbnail   string `json:"thumbnail,omitempty"`
+	Title       string `json:"title,omitempty"`
+	// may be empty
+	Duration int64 `json:"duration,omitempty"`
 }
 
 func (y *YoutubeInfo) Scan(v any) error {
@@ -33,9 +35,6 @@ func (y *YoutubeInfo) Scan(v any) error {
 }
 
 func (y YoutubeInfo) Value() (driver.Value, error) {
-	if y.Duration == 0 && y.Thumbnail == "" && y.Title == "" && y.PublishedAt == 0 {
-		return string("{}"), nil
-	}
 	b, err := json.Marshal(y)
 	return string(b), err
 }

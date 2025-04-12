@@ -42,33 +42,20 @@ func main() {
 	var (
 		playlistLogic = logic.NewPlaylist(playlistPg, videoPg, streamPg, tg)
 		videoLogic    = logic.NewVideo(videoPg, youtube, ytdlp, sponsorBlock)
+		streamLogic   = logic.NewStream(streamPg, videoPg, playlistPg, youtube)
 	)
 
 	manager := streamer.NewManager(playlistLogic, videoLogic, streamPg, ytdlp)
-	fillDb(ctx)
+
 	manager.Run(ctx)
 	playlistLogic.Run(ctx)
 	videoLogic.Run(ctx)
+	streamLogic.Run(ctx)
+
 	<-stopContext.Done()
 	log.Default().Info("stop signal received")
 	manager.Stop()
 	playlistLogic.Stop()
 	videoLogic.Stop()
-}
-
-func fillDb(ctx context.Context) {
-	codes := []string{"4evV8Fr5A8U", "8OkpRK2_gVs", "jIfogFtgV-o", "a4na2opArGY", "0YF8vecQWYs", "pmanD_s7G3U",
-		"atxYe-nOa9w", "792vg0amsuQ", "_FDEH7hWb8c", "JdSpuTi9d8A", "EZKzXnq6ppk"}
-	for _, code := range codes {
-		video, err := postgres.NewVideo().Create(ctx, app.Video{
-			Code: code,
-		})
-		if err != nil {
-			panic(err)
-		}
-		err = postgres.NewPlaylist().Create(ctx, video.Id, 1)
-		if err != nil {
-			panic(err)
-		}
-	}
+	streamLogic.Stop()
 }

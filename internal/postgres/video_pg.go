@@ -26,9 +26,15 @@ func (Video) UpdateFileName(ctx context.Context, id int64, fileName string) erro
 	return pg.FromContext(ctx).Query(sql, fileName, time.Now().Unix(), id).ExecContext(ctx)
 }
 
-func (Video) AddYoutubeInfo(ctx context.Context, id int64, info app.YoutubeInfo) error {
-	sql := `update video set yt_info = ? where id = ?`
-	return pg.FromContext(ctx).Query(sql, info, id).ExecContext(ctx)
+func (Video) AddYoutubeInfos(ctx context.Context, videos []app.Video) error {
+	sql := ""
+	vals := make([]any, len(videos)*2)
+	for i, v := range videos {
+		vals[i*2] = v.YtInfo
+		vals[i*2+1] = v.Id
+		sql += `update video set yt_info = ? where id = ?;`
+	}
+	return pg.FromContext(ctx).Query(sql, vals...).ExecContext(ctx)
 }
 
 func (Video) AddSponsorBlockInfo(ctx context.Context, id int64, info app.SponsorBlockInfo) error {
@@ -41,12 +47,12 @@ func (Video) Get(ctx context.Context, id int64) (video app.Video, err error) {
 	return video, pg.FromContext(ctx).Query(sql, id).LoadOneContext(ctx, &video)
 }
 
-func (Video) GetNoYtInfo(ctx context.Context) (video app.Video, err error) {
+func (Video) GetNoYtInfo(ctx context.Context) (res []app.Video, err error) {
 	sql := `select id, code, created_at, downloaded_at, file_name, sb_info
 			from video
 			where yt_info = '{}'
-			limit 1`
-	return video, pg.FromContext(ctx).Query(sql).LoadOneContext(ctx, &video)
+			limit 50`
+	return res, pg.FromContext(ctx).Query(sql).LoadContext(ctx, &res)
 }
 
 func (Video) GetNoSbInfo(ctx context.Context) (video app.Video, err error) {
@@ -58,11 +64,25 @@ func (Video) GetNoSbInfo(ctx context.Context) (video app.Video, err error) {
 }
 
 func (Video) Create(ctx context.Context, video app.Video) (res app.Video, err error) {
-	sql := `insert into video(code)
-	values (?)
-	on conflict (code) do update set code = excluded.code
+	sql := `insert into video (code, yt_info)
+	values (?,?)
+	on conflict (code) do update set yt_info = excluded.yt_info
 	returning id, code, created_at`
-	return res, pg.FromContext(ctx).Query(sql, video.Code).LoadOneContext(ctx, &res)
+	return res, pg.FromContext(ctx).Query(sql, video.Code, video.YtInfo).LoadOneContext(ctx, &res)
+}
+
+func (Video) CreateList(ctx context.Context, videos []app.Video) (res []app.Video, err error) {
+	vals := make([]any, len(videos)*2)
+	qs := make([]string, len(videos))
+	for i := range videos {
+		vals[i*2] = videos[i].Code
+		vals[i*2+1] = videos[i].YtInfo
+		qs[i] = "(?,?)"
+	}
+	sql := fmt.Sprintf(`insert into video (code, yt_info) values %s
+	on conflict (code) do update set yt_info = excluded.yt_info
+	returning id, code, created_at`, strings.Join(qs, ","))
+	return res, pg.FromContext(ctx).Query(sql, vals...).LoadContext(ctx, &res)
 }
 
 func (Video) DeleteFileNames(ctx context.Context, fileNames []string) error {

@@ -23,10 +23,26 @@ func NewTelegram(token string) *Telegram {
 }
 
 func (c *Telegram) Announce(ctx context.Context, chatId int64, video app.Video) error {
+	// like := "like_" + strconv.FormatInt(video.Id, 10)
+	// skip := "skip_" + strconv.FormatInt(video.Id, 10)
 	_, err := c.client.Send(tgbotapi.PhotoConfig{
 		BaseFile: tgbotapi.BaseFile{
 			BaseChat: tgbotapi.BaseChat{
 				ChatID: chatId,
+				// ReplyMarkup: tgbotapi.InlineKeyboardMarkup{
+				// 	InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{
+				// 		{
+				// 			tgbotapi.InlineKeyboardButton{
+				// 				Text:         "Like",
+				// 				CallbackData: &like,
+				// 			},
+				// 			tgbotapi.InlineKeyboardButton{
+				// 				Text:         "Skip",
+				// 				CallbackData: &skip,
+				// 			},
+				// 		},
+				// 	},
+				// },
 			},
 			File: tgbotapi.FileURL(video.YtInfo.Thumbnail),
 		},

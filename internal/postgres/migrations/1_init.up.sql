@@ -12,6 +12,7 @@ create table stream (
     id        bigserial not null primary key,
     name      text      not null default '',
     is_active bool      not null default false,
+    type      text      not null default null,
     settings  jsonb     not null default '{}'
 );
 
