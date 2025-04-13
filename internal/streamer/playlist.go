@@ -9,24 +9,10 @@ import (
 	"time"
 )
 
-// func PlayVideos(ctx context.Context, config app.Config) {
-// 	p := NewPlaylist(app.Stream{
-// 		Id:   1,
-// 		Name: "anime openings",
-// 		Settings: app.Settings{
-// 			"url": config.StreamingUrl,
-// 		},
-// 	}, rpc.NewYtDlpClient(config.VideosDir), logic.NewPlaylist(postgres.NewPlaylist(), postgres.NewVideo()))
-// 	p.Run(ctx)
-// 	<-ctx.Done()
-// 	p.Stop()
-// }
-
 type Playlist struct {
 	playlistLogic *logic.Playlist
 	stream        app.Stream
 	toReader      chan<- app.Video
-	stopFunc      func()
 }
 
 func NewPlaylist(toReader chan<- app.Video, s app.Stream, playlistLogic *logic.Playlist) *Playlist {

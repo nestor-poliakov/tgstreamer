@@ -34,7 +34,6 @@ func (y *YtDlpClient) Touch(ctx context.Context, videoCode string) {
 }
 
 func (y *YtDlpClient) download(ctx context.Context, videoUrl string, fileName string) (string, error) {
-
 	_, err := os.Stat(fileName)
 	if err == nil {
 		log.FromContexts(ctx).Infof("file %q already exist, touching", fileName)

@@ -12,8 +12,6 @@ import (
 	"strings"
 	"sync"
 	"tgstreamer/internal/app"
-	"tgstreamer/internal/logic"
-	"tgstreamer/internal/rpc"
 	"tgstreamer/lib/log"
 
 	"github.com/nestor-poliakov/joy5/av"
@@ -24,18 +22,14 @@ import (
 )
 
 type Reader struct {
-	videos     <-chan app.Video
-	ch         chan<- piece
-	downloader *rpc.YtDlpClient
-	videoLogic *logic.Video
+	videos <-chan app.Video
+	ch     chan<- piece
 }
 
-func NewReader(videos <-chan app.Video, ch chan<- piece, downloader *rpc.YtDlpClient, videoLogic *logic.Video) *Reader {
+func NewReader(videos <-chan app.Video, ch chan<- piece) *Reader {
 	return &Reader{
-		videos:     videos,
-		ch:         ch,
-		downloader: downloader,
-		videoLogic: videoLogic,
+		videos: videos,
+		ch:     ch,
 	}
 }
 
@@ -68,31 +62,23 @@ func (r *Reader) readingLoop(ctx context.Context, wg *sync.WaitGroup) {
 }
 
 func (r *Reader) processVideo(ctx context.Context, video app.Video) (err error) {
-	video.FileName, err = r.downloader.DownloadYt(ctx, video.Code)
-	if err != nil {
-		return fmt.Errorf("download video: %w", err)
-	}
-	r.videoLogic.SetDownloaded(video.Id, video.FileName)
 	log.FromContexts(ctx).Infof("start reading new video %q", video.FileName)
-	var reader io.ReadCloser
-	var m flvio.AMFMap
-	switch video.FileName[len(video.FileName)-3:] {
-	case "mp4":
-		reader, m, err = r.getMp4Reader(ctx, video.FileName)
-	case "flv":
-		reader, err = r.getFlvReader(video.FileName)
-	default:
+	if len(video.FileName) == 0 {
+		return fmt.Errorf("file name is empty")
+	}
+	if !strings.HasSuffix(video.FileName, ".mp4") {
 		return fmt.Errorf("unknown video format %q", video.FileName)
 	}
+	reader, m, err := r.getMp4Reader(ctx, video.FileName)
 	if err != nil {
-		return err
+		return fmt.Errorf("get reader: %w", err)
 	}
-	defer reader.Close()
+	defer reader.CloseWithError(io.EOF)
 	defer log.FromContexts(ctx).Infof("finished reading video %q", video.FileName)
 	return r.processReader(ctx, reader, video, m)
 }
 
-func (r *Reader) getMp4Reader(ctx context.Context, fileName string) (io.ReadCloser, flvio.AMFMap, error) {
+func (r *Reader) getMp4Reader(ctx context.Context, fileName string) (*io.PipeReader, flvio.AMFMap, error) {
 	pr, pw := io.Pipe()
 	f, err := os.Open(fileName)
 	if err != nil {
@@ -113,6 +99,7 @@ func (r *Reader) getMp4Reader(ctx context.Context, fileName string) (io.ReadClos
 		defer log.FromContext(ctx).Info("stop reading mp4 file")
 		defer f.Close()
 		defer pr.CloseWithError(io.EOF)
+		defer pw.CloseWithError(io.EOF)
 		for {
 			p, err := demuxer.ReadPacket()
 			if errors.Is(err, io.EOF) {
@@ -198,6 +185,16 @@ func (r *Reader) readUntilKeyFrame(d *flv.Demuxer, packets []av.Packet) ([]av.Pa
 			return packets, packet, nil
 		}
 		packets = append(packets, packet)
+	}
+}
+
+func makeMetadataPacket(info gomp4.Mp4Info, tracks []gomp4.TrackInfo) av.Packet {
+	m := ConvertToMetadata(info, tracks)
+	data := make([]byte, flvio.FillAMF0Vals(nil, []any{m}))
+	flvio.FillAMF0Vals(data, []any{m})
+	return av.Packet{
+		Type: av.Metadata,
+		Data: data,
 	}
 }
 

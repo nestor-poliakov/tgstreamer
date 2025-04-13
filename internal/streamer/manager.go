@@ -76,7 +76,6 @@ func (m *Manager) updateStreams(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get all streams: %w", err)
 	}
-	fmt.Println("streams:", streams)
 	streamsMap := map[int64]bool{}
 	for _, stream := range streams {
 		streamsMap[stream.Id] = true
@@ -94,17 +93,19 @@ func (m *Manager) updateStreams(ctx context.Context) error {
 }
 
 func (m *Manager) runStream(ctx context.Context, strm app.Stream) {
+	toDownloader := make(chan app.Video, 0)
 	toReader := make(chan app.Video, 0)
 	toAdCutter := make(chan piece, 0)
 	toStreamer := make(chan piece, 20)
 	s := &stream{
-		stream:   strm,
-		playlist: NewPlaylist(toReader, strm, m.playlistLogic),
-		reader:   NewReader(toReader, toAdCutter, m.downloader, m.videoLogic),
-		adCutter: NewAdCutter(toAdCutter, toStreamer),
-		streamer: NewStreamer(toStreamer, strm, m.playlistLogic),
-		wg:       &sync.WaitGroup{},
-		stopFunc: func() {},
+		stream:     strm,
+		playlist:   NewPlaylist(toDownloader, strm, m.playlistLogic),
+		downloader: NewDownloader(toDownloader, toReader, m.downloader, m.videoLogic),
+		reader:     NewReader(toReader, toAdCutter),
+		adCutter:   NewAdCutter(toAdCutter, toStreamer),
+		streamer:   NewStreamer(toStreamer, strm, m.playlistLogic),
+		wg:         &sync.WaitGroup{},
+		stopFunc:   func() {},
 	}
 	s.Run(ctx)
 	m.streams[s.stream.Id] = s
@@ -119,19 +120,21 @@ func (m *Manager) stopStream(ctx context.Context, id int64) {
 }
 
 type stream struct {
-	stream   app.Stream
-	playlist *Playlist
-	reader   *Reader
-	adCutter *AdCutter
-	streamer *Streamer
-	wg       *sync.WaitGroup
-	stopFunc func()
+	stream     app.Stream
+	playlist   *Playlist
+	downloader *Downloader
+	reader     *Reader
+	adCutter   *AdCutter
+	streamer   *Streamer
+	wg         *sync.WaitGroup
+	stopFunc   func()
 }
 
 func (s *stream) Run(ctx context.Context) {
 	ctx = log.With(ctx, "stream_id", s.stream.Id)
 	ctx, s.stopFunc = context.WithCancel(ctx)
 	s.playlist.Run(ctx, s.wg)
+	s.downloader.Run(ctx, s.wg)
 	s.reader.Run(ctx, s.wg)
 	s.adCutter.Run(ctx, s.wg)
 	s.streamer.Run(ctx, s.wg)

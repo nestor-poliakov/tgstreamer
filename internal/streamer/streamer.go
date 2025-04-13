@@ -8,6 +8,7 @@ import (
 	"tgstreamer/internal/app"
 	"tgstreamer/internal/logic"
 	"tgstreamer/lib/log"
+	"time"
 
 	"github.com/nestor-poliakov/joy5/av"
 	"github.com/nestor-poliakov/joy5/format/flv/flvio"
@@ -48,7 +49,12 @@ func (s *Streamer) reconnect() (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to connect to rtmp server %q: %w", s.url, err)
 	}
-
+	for i := range s.configs {
+		err = s.conn.WritePacket(s.configs[i])
+		if err != nil {
+			return fmt.Errorf("write %s config: %w", av.PacketTypeString[s.configs[i].Type], err)
+		}
+	}
 	return nil
 }
 
@@ -67,8 +73,6 @@ func (s *Streamer) streamingLoop(ctx context.Context, wg *sync.WaitGroup) {
 	defer wg.Done()
 	defer log.FromContext(ctx).Info("streaming ended; closing connection")
 	defer s.nconn.Close()
-
-	videoCtx := ctx
 	for {
 		select {
 		case <-ctx.Done():
@@ -77,34 +81,49 @@ func (s *Streamer) streamingLoop(ctx context.Context, wg *sync.WaitGroup) {
 			if !ok {
 				return
 			}
-			if piece.videoId != s.curVideoId {
-				s.playlistLogic.SetCurrent(piece.videoId)
-				s.rl = newRateLimiter()
-				s.configs = s.configs[:0]
-				s.curVideoId = piece.videoId
-				videoCtx = log.With(ctx, "video_id", piece.videoId)
-				log.FromContext(videoCtx).Info("start streaming new video")
-			}
-			if len(piece.packets) == 0 {
-				continue
-			}
-			err := s.processPackets(videoCtx, piece.packets)
+			vctx := log.With(ctx, "video_id", piece.videoId)
+			err := s.processPackets(vctx, piece)
 			if err != nil {
-				log.FromContexts(videoCtx).With("error", err).Errorf("process %d packets", len(piece.packets))
+				log.FromContexts(vctx).With("error", err).Errorf("process %d packets", len(piece.packets))
 				continue
 			}
 		}
 	}
 }
 
-func (s *Streamer) processPackets(ctx context.Context, packets []av.Packet) error {
-	config, videos, audios := calcPackets(packets)
-	log.FromContexts(ctx).Debugf("processing %d packets from %s to %s; c: %d a: %d v: %d", len(packets), packets[0].Time, packets[len(packets)-1].Time, config, audios, videos)
-	for i := range packets {
-		err := s.processPacket(packets[i])
+func (s *Streamer) processPackets(ctx context.Context, piece piece) error {
+	if piece.videoId != s.curVideoId {
+		s.playlistLogic.SetCurrent(piece.videoId)
+		s.rl = newRateLimiter()
+		s.configs = s.configs[:0]
+		s.curVideoId = piece.videoId
+		log.FromContext(ctx).Info("start streaming new video")
+	}
+	if len(piece.packets) == 0 {
+		return nil
+	}
+	config, videos, audios := calcPackets(piece.packets)
+	log.FromContexts(ctx).Debugf("processing %d packets from %s to %s; c: %d a: %d v: %d", len(piece.packets), piece.packets[0].Time, piece.packets[len(piece.packets)-1].Time, config, audios, videos)
+	reconnects := 0
+	for i := range piece.packets {
+		err := s.processPacket(piece.packets[i])
 		if err != nil {
-			log.FromContexts(ctx).With("error", err).Error("processing packet %q; reconnecting", av.PacketTypeString[packets[i].Type])
+			if reconnects > 10 {
+				var t *time.Timer
+				if reconnects > 20 {
+					t = time.NewTimer(time.Minute)
+				} else {
+					t = time.NewTimer(time.Second * time.Duration(reconnects))
+				}
+				select {
+				case <-t.C:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+			log.FromContexts(ctx).With("error", err).Error("processing packet %q; reconnecting", av.PacketTypeString[piece.packets[i].Type])
 			s.reconnect()
+			reconnects++
 			i--
 		}
 	}

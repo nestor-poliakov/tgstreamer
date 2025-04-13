@@ -10,7 +10,7 @@ import (
 
 // ConvertMP4PacketToFLV converts an MP4 packet to an FLV packet
 // It handles both audio (AAC) and video (H264) packets
-func ConvertMP4PacketToFLV(mp4Packet mp4.AVPacket) (av.Packet, error) {
+func ConvertMP4PacketToFLV(mp4Packet *mp4.AVPacket) (av.Packet, error) {
 	flvPacket := av.Packet{
 		Data:  mp4Packet.Data,
 		Time:  time.Duration(mp4Packet.Pts), // Using PTS for the presentation timestamp

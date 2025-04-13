@@ -68,9 +68,6 @@ func (y *Youtube) GetPlaylist(ctx context.Context, playlistId string) (videos []
 			log.FromContext(ctx).Error("do request", "error", err)
 			break
 		}
-		// b, _ := json.MarshalIndent(resp, "", "  ")
-		// fmt.Println("resp:", string(b))
-		// os.Exit(0)
 		pageToken = resp.NextPageToken
 		videos = append(videos, y.toVideoCodes(resp.Items)...)
 	}
