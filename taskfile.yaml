@@ -1,6 +1,7 @@
 version: "3"
 env:
-  VIDEO: "https://www.youtube.com/watch?v=8OkpRK2_gVs"
+  VIDEO: "https://www.youtube.com/watch?v=d-KxsdWX9xE"
+  PLAYLIST: "https://www.youtube.com/playlist?list=PLjNlQ2vXx1xbt30X8TcUfNzw_akVISXEu"
 tasks:
   run:
     desc: Run main.go
@@ -14,4 +15,9 @@ tasks:
   vinfo:
     desc: Get video info
     cmds:
-      - yt-dlp -F "$VIDEO"
+      - yt-dlp --dump-json "$VIDEO" > local/video_info.json
+
+  pinfo:
+    desc: Get playlist info
+    cmds:
+      - yt-dlp --dump-json "$PLAYLIST" > local/playlist_info.json

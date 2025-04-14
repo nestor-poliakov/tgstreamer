@@ -7,13 +7,23 @@ import (
 )
 
 type Video struct {
-	Id           int64
-	Code         string
-	FileName     string
-	CreatedAt    int64
-	DownloadedAt int64
-	YtInfo       YoutubeInfo
-	SbInfo       SponsorBlockInfo
+	Id        int64
+	Code      string
+	CreatedAt int64
+	FileInfo  FileInfo
+	YtInfo    YoutubeInfo
+	SbInfo    SponsorBlockInfo
+}
+
+type FileInfo struct {
+	Name          string `json:"name,omitempty"`
+	DownloadedAt  int64  `json:"downloaded_at,omitempty"`
+	AudioChannels int    `json:"audio_channels,omitempty"`
+	Size          int    `json:"size,omitempty"`
+	Width         int    `json:"width,omitempty"`
+	Height        int    `json:"height,omitempty"`
+	Duration      int    `json:"duration,omitempty"`
+	Fps           int    `json:"fps,omitempty"`
 }
 
 type YoutubeInfo struct {
@@ -21,22 +31,6 @@ type YoutubeInfo struct {
 	PublishedAt int64  `json:"published_at,omitempty"`
 	Thumbnail   string `json:"thumbnail,omitempty"`
 	Title       string `json:"title,omitempty"`
-	// may be empty
-	Duration int64 `json:"duration,omitempty"`
-}
-
-func (y *YoutubeInfo) Scan(v any) error {
-	switch b := v.(type) {
-	case []byte:
-		return json.Unmarshal(b, y)
-	default:
-		return fmt.Errorf("unsupported type %T", v)
-	}
-}
-
-func (y YoutubeInfo) Value() (driver.Value, error) {
-	b, err := json.Marshal(y)
-	return string(b), err
 }
 
 type SponsorBlockInfo struct {
@@ -55,6 +49,26 @@ type Segment struct {
 	Description   string     `json:"description"`
 }
 
+type PlaylistItem struct {
+	Id       int64
+	VideoId  int64
+	StreamId int64
+}
+
+func (y *YoutubeInfo) Scan(v any) error {
+	switch b := v.(type) {
+	case []byte:
+		return json.Unmarshal(b, y)
+	default:
+		return fmt.Errorf("unsupported type %T", v)
+	}
+}
+
+func (y YoutubeInfo) Value() (driver.Value, error) {
+	b, err := json.Marshal(y)
+	return string(b), err
+}
+
 func (y *SponsorBlockInfo) Scan(v any) error {
 	switch b := v.(type) {
 	case []byte:
@@ -69,8 +83,16 @@ func (y SponsorBlockInfo) Value() (driver.Value, error) {
 	return string(b), err
 }
 
-type PlaylistItem struct {
-	Id       int64
-	VideoId  int64
-	StreamId int64
+func (y *FileInfo) Scan(v any) error {
+	switch b := v.(type) {
+	case []byte:
+		return json.Unmarshal(b, y)
+	default:
+		return fmt.Errorf("unsupported type %T", v)
+	}
+}
+
+func (y FileInfo) Value() (driver.Value, error) {
+	b, err := json.Marshal(y)
+	return string(b), err
 }

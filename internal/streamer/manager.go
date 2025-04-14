@@ -3,6 +3,7 @@ package streamer
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sync"
 	"tgstreamer/internal/app"
 	"tgstreamer/internal/logic"
@@ -76,18 +77,36 @@ func (m *Manager) updateStreams(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get all streams: %w", err)
 	}
+	toStop := make([]int64, 0)
+	toRun := make([]app.Stream, 0)
 	streamsMap := map[int64]bool{}
 	for _, stream := range streams {
 		streamsMap[stream.Id] = true
-		_, ok := m.streams[stream.Id]
-		if !ok {
-			m.runStream(ctx, stream)
-		}
 	}
 	for id := range m.streams {
 		if !streamsMap[id] {
-			m.stopStream(ctx, id)
+			toStop = append(toStop, id)
 		}
+	}
+	for _, strm := range streams {
+		runningStream, ok := m.streams[strm.Id]
+		if !ok {
+			toRun = append(toRun, strm)
+			continue
+		}
+		if reflect.DeepEqual(runningStream.stream.Settings, strm.Settings) {
+			continue
+		}
+		// settings changed, restart stream with new settings
+		toStop = append(toStop, strm.Id)
+		toRun = append(toRun, strm)
+	}
+
+	for _, id := range toStop {
+		m.stopStream(ctx, id)
+	}
+	for _, strm := range toRun {
+		m.runStream(ctx, strm)
 	}
 	return nil
 }
@@ -100,7 +119,7 @@ func (m *Manager) runStream(ctx context.Context, strm app.Stream) {
 	s := &stream{
 		stream:     strm,
 		playlist:   NewPlaylist(toDownloader, strm, m.playlistLogic),
-		downloader: NewDownloader(toDownloader, toReader, m.downloader, m.videoLogic),
+		downloader: NewDownloader(toDownloader, toReader, m.downloader, m.videoLogic, strm.Settings.Resolution),
 		reader:     NewReader(toReader, toAdCutter),
 		adCutter:   NewAdCutter(toAdCutter, toStreamer),
 		streamer:   NewStreamer(toStreamer, strm, m.playlistLogic),

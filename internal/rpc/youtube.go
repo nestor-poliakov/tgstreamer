@@ -43,7 +43,6 @@ func (y *Youtube) GetInfo(ctx context.Context, youtubeVideoIds []string) (res []
 			PublishedAt: publishedAt.Unix(),
 			Thumbnail:   y.getThumbnailUrl(*v.Snippet.Thumbnails),
 			Title:       v.Snippet.Title,
-			Duration:    y.parseDuration(v.ContentDetails.Duration),
 		}
 	}
 	for _, id := range youtubeVideoIds {

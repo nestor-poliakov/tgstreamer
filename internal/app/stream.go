@@ -21,9 +21,10 @@ type Stream struct {
 }
 
 type Settings struct {
-	Url          string `json:"url"`
-	TgChannelId  int64  `json:"tg_channel_id"`
-	PlaylistCode string `json:"playlist_code"`
+	Url          string `json:"url,omitempty"`
+	TgChannelId  int64  `json:"tg_channel_id,omitempty"`
+	PlaylistCode string `json:"playlist_code,omitempty"`
+	Resolution   string `json:"resolution,omitempty"`
 }
 
 func (y *Settings) Scan(v any) error {

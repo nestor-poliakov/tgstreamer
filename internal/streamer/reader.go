@@ -55,26 +55,26 @@ func (r *Reader) readingLoop(ctx context.Context, wg *sync.WaitGroup) {
 			vctx = log.With(ctx, "video_id", video.Id)
 			err := r.processVideo(vctx, video)
 			if err != nil {
-				log.FromContexts(vctx).With("error", err).Errorf("process video %q", video.FileName)
+				log.FromContexts(vctx).With("error", err).Errorf("process video %q", video.FileInfo.Name)
 			}
 		}
 	}
 }
 
 func (r *Reader) processVideo(ctx context.Context, video app.Video) (err error) {
-	log.FromContexts(ctx).Infof("start reading new video %q", video.FileName)
-	if len(video.FileName) == 0 {
+	log.FromContexts(ctx).Infof("start reading new video %q", video.FileInfo.Name)
+	if len(video.FileInfo.Name) == 0 {
 		return fmt.Errorf("file name is empty")
 	}
-	if !strings.HasSuffix(video.FileName, ".mp4") {
-		return fmt.Errorf("unknown video format %q", video.FileName)
+	if !strings.HasSuffix(video.FileInfo.Name, ".mp4") {
+		return fmt.Errorf("unknown video format %q", video.FileInfo.Name)
 	}
-	reader, m, err := r.getMp4Reader(ctx, video.FileName)
+	reader, m, err := r.getMp4Reader(ctx, video.FileInfo.Name)
 	if err != nil {
 		return fmt.Errorf("get reader: %w", err)
 	}
-	defer reader.CloseWithError(io.EOF)
-	defer log.FromContexts(ctx).Infof("finished reading video %q", video.FileName)
+	defer reader.Close()
+	defer log.FromContexts(ctx).Infof("finished reading video %q", video.FileInfo.Name)
 	return r.processReader(ctx, reader, video, m)
 }
 
@@ -98,8 +98,7 @@ func (r *Reader) getMp4Reader(ctx context.Context, fileName string) (*io.PipeRea
 	go func() {
 		defer log.FromContext(ctx).Info("stop reading mp4 file")
 		defer f.Close()
-		defer pr.CloseWithError(io.EOF)
-		defer pw.CloseWithError(io.EOF)
+		defer pw.Close()
 		for {
 			p, err := demuxer.ReadPacket()
 			if errors.Is(err, io.EOF) {
@@ -154,10 +153,10 @@ func (r *Reader) processReader(ctx context.Context, reader io.Reader, video app.
 			Data: data,
 		},
 	}
-	log.FromContexts(ctx).Infof("start processing file %q", video.FileName)
+	log.FromContexts(ctx).Infof("start processing file %q", video.FileInfo.Name)
 	for {
 		packets, keyFrame, err := r.readUntilKeyFrame(demuxer, keyFrames)
-		if errors.Is(err, io.EOF) {
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 			return nil
 		}
 		if err != nil {

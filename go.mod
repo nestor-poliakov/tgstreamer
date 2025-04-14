@@ -10,6 +10,7 @@ require (
 	github.com/nestor-poliakov/joy5 v0.0.0-20250406181521-54374d34636f
 	github.com/yapingcat/gomedia v0.0.0-20240906162731-17feea57090c
 	google.golang.org/api v0.169.0
+	gopkg.in/telebot.v4 v4.0.0-beta.4
 	gopkg.in/yaml.v3 v3.0.1
 )
 

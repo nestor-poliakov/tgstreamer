@@ -13,6 +13,7 @@ Infinite stream to telegram channel with videos from YouTube
 - [x] delete files after streaming
 - [x] send video cover to channel when it starts
 - [x] form playlist from youtube playlists
+- [x] filter video by resolution
 - [ ] form playlist from youtube channels
 - [ ] cut ad using data from SponsorBlock
 - [ ] predownloading videos before streaming pipeline

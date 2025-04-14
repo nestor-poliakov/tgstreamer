@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"tgstreamer/internal/app"
 	"tgstreamer/internal/postgres"
 	"tgstreamer/internal/rpc"
 	"tgstreamer/lib/log"
@@ -17,7 +18,7 @@ type Video struct {
 	downloader      *rpc.YtDlpClient
 	sb              *rpc.SponsorBlockClient
 	videoStorage    postgres.Video
-	toSetDownloaded chan downloaded
+	toSetDownloaded chan infoUpdate
 	wg              *sync.WaitGroup
 	stopFunc        func()
 }
@@ -28,7 +29,7 @@ func NewVideo(videoStorage postgres.Video, youtube *rpc.Youtube, downloader *rpc
 		downloader:      downloader,
 		sb:              sb,
 		videoStorage:    videoStorage,
-		toSetDownloaded: make(chan downloaded, 10),
+		toSetDownloaded: make(chan infoUpdate, 10),
 		wg:              &sync.WaitGroup{},
 		stopFunc:        func() {},
 	}
@@ -66,29 +67,29 @@ func (v *Video) settingDownloadedLoop(ctx context.Context) {
 	}
 }
 
-func (v *Video) setDownloaded(ctx context.Context, downloaded downloaded) error {
+func (v *Video) setDownloaded(ctx context.Context, downloaded infoUpdate) error {
 	video, err := v.videoStorage.Get(ctx, downloaded.id)
 	if err != nil {
 		return fmt.Errorf("get video %d: %w", downloaded.id, err)
 	}
-	if video.FileName == downloaded.fileName {
+	if video.FileInfo.Name == downloaded.info.Name {
 		return nil
 	}
-	err = v.videoStorage.UpdateFileName(ctx, video.Id, downloaded.fileName)
+	err = v.videoStorage.AddFileInfo(ctx, video.Id, downloaded.info)
 	if err != nil {
-		return fmt.Errorf("update video filename: %w", err)
+		return fmt.Errorf("update video file info: %w", err)
 	}
 	return nil
 }
 
-type downloaded struct {
-	id       int64
-	fileName string
+type infoUpdate struct {
+	id   int64
+	info app.FileInfo
 }
 
-func (v *Video) SetDownloaded(id int64, fileName string) {
+func (v *Video) SetDownloaded(id int64, info app.FileInfo) {
 	select {
-	case v.toSetDownloaded <- downloaded{id: id, fileName: fileName}:
+	case v.toSetDownloaded <- infoUpdate{id: id, info: info}:
 	default:
 	}
 }
@@ -199,7 +200,7 @@ func (v *Video) deleteFiles(ctx context.Context) error {
 	}
 	toDelete := make([]string, 0)
 	for _, file := range files {
-		if time.Since(file.ModAt) < time.Hour*24*2 {
+		if time.Since(file.ModAt) < time.Hour*24*7 {
 			continue
 		}
 		toDelete = append(toDelete, file.Name)

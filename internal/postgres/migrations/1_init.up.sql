@@ -1,9 +1,8 @@
 create table video (
     id            bigserial not null primary key,
     code          text      not null unique,
-    file_name     text      not null default '',
     created_at    bigint    not null default extract(epoch from now()),
-    downloaded_at bigint    not null default 0,
+    file_info     jsonb     not null default '{}',
     yt_info       jsonb     not null default '{}',
     sb_info       jsonb     not null default '{}'
 );

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"tgstreamer/internal/app"
 
@@ -17,13 +16,9 @@ func NewVideo() Video {
 	return Video{}
 }
 
-func (Video) GetList(ctx context.Context) ([]app.Video, error) {
-	return nil, fmt.Errorf("unimplemented")
-}
-
-func (Video) UpdateFileName(ctx context.Context, id int64, fileName string) error {
-	sql := `update video set (file_name,downloaded_at) = (?,?) where id = ?`
-	return pg.FromContext(ctx).Query(sql, fileName, time.Now().Unix(), id).ExecContext(ctx)
+func (Video) AddFileInfo(ctx context.Context, id int64, fileInfo app.FileInfo) error {
+	sql := `update video set file_info = ? where id = ?`
+	return pg.FromContext(ctx).Query(sql, fileInfo, id).ExecContext(ctx)
 }
 
 func (Video) AddYoutubeInfos(ctx context.Context, videos []app.Video) error {
@@ -43,12 +38,12 @@ func (Video) AddSponsorBlockInfo(ctx context.Context, id int64, info app.Sponsor
 }
 
 func (Video) Get(ctx context.Context, id int64) (video app.Video, err error) {
-	sql := `select id, code, created_at, downloaded_at, file_name, yt_info, sb_info from video where id = ?`
+	sql := `select id, code, created_at, file_info, yt_info, sb_info from video where id = ?`
 	return video, pg.FromContext(ctx).Query(sql, id).LoadOneContext(ctx, &video)
 }
 
 func (Video) GetNoYtInfo(ctx context.Context) (res []app.Video, err error) {
-	sql := `select id, code, created_at, downloaded_at, file_name, sb_info
+	sql := `select id, code, created_at, file_info, sb_info
 			from video
 			where yt_info = '{}'
 			limit 50`
@@ -56,7 +51,7 @@ func (Video) GetNoYtInfo(ctx context.Context) (res []app.Video, err error) {
 }
 
 func (Video) GetNoSbInfo(ctx context.Context) (video app.Video, err error) {
-	sql := `select id, code, created_at, downloaded_at, file_name, yt_info
+	sql := `select id, code, created_at, file_info, yt_info
 			from video
 			where sb_info = '{}'
 			limit 1`
@@ -90,7 +85,10 @@ func (Video) DeleteFileNames(ctx context.Context, fileNames []string) error {
 	for i := range fileNames {
 		vals[i] = fileNames[i]
 	}
-	sql := `update video set (file_name,downloaded_at) = ('',0) where file_name in (` + questions(len(fileNames)) + `)`
+	sql := `update video
+			set (file_info) = ('{}')
+			where file_info ->> 'name' is not null
+			and file_info ->> 'name' in (` + questions(len(fileNames)) + `)`
 	return pg.FromContext(ctx).Query(sql, vals...).ExecContext(ctx)
 }
 
