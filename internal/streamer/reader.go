@@ -164,6 +164,7 @@ func (r *Reader) processReader(ctx context.Context, reader io.Reader, video app.
 		}
 		select {
 		case r.ch <- piece{
+			Video:   &video,
 			videoId: video.Id,
 			packets: packets,
 		}:

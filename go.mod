@@ -7,6 +7,7 @@ require (
 	github.com/gocraft/dbr/v2 v2.7.7
 	github.com/golang-migrate/migrate/v4 v4.18.2
 	github.com/lib/pq v1.10.9
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/nestor-poliakov/joy5 v0.0.0-20250406181521-54374d34636f
 	github.com/yapingcat/gomedia v0.0.0-20240906162731-17feea57090c
 	google.golang.org/api v0.169.0

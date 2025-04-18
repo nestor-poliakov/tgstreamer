@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-type StreamLogic struct {
+type Stream struct {
 	streamStorage   postgres.Stream
 	videoStorage    postgres.Video
 	playlistStorage postgres.Playlist
@@ -20,8 +20,8 @@ type StreamLogic struct {
 	stopFunc        context.CancelFunc
 }
 
-func NewStream(streamStorage postgres.Stream, videoStorage postgres.Video, playlistStorage postgres.Playlist, youtube *rpc.Youtube) *StreamLogic {
-	return &StreamLogic{
+func NewStream(streamStorage postgres.Stream, videoStorage postgres.Video, playlistStorage postgres.Playlist, youtube *rpc.Youtube) *Stream {
+	return &Stream{
 		streamStorage:   streamStorage,
 		videoStorage:    videoStorage,
 		playlistStorage: playlistStorage,
@@ -31,18 +31,18 @@ func NewStream(streamStorage postgres.Stream, videoStorage postgres.Video, playl
 	}
 }
 
-func (s *StreamLogic) Run(ctx context.Context) {
+func (s *Stream) Run(ctx context.Context) {
 	ctx, s.stopFunc = context.WithCancel(ctx)
 	s.wg.Add(1)
 	go s.playlistUpdateLoop(log.With(ctx, "worker", "playlist_updater"))
 }
 
-func (s *StreamLogic) Stop() {
+func (s *Stream) Stop() {
 	s.stopFunc()
 	s.wg.Wait()
 }
 
-func (s *StreamLogic) playlistUpdateLoop(ctx context.Context) {
+func (s *Stream) playlistUpdateLoop(ctx context.Context) {
 	defer s.wg.Done()
 	t := time.NewTicker(time.Hour * 10)
 	defer t.Stop()
@@ -59,7 +59,7 @@ func (s *StreamLogic) playlistUpdateLoop(ctx context.Context) {
 	}
 }
 
-func (s *StreamLogic) updatePlaylistsInfo(ctx context.Context) error {
+func (s *Stream) updatePlaylistsInfo(ctx context.Context) error {
 	streams, err := s.streamStorage.GetActive(ctx)
 	if err != nil {
 		return fmt.Errorf("get active streams: %w", err)
@@ -75,7 +75,7 @@ func (s *StreamLogic) updatePlaylistsInfo(ctx context.Context) error {
 	return nil
 }
 
-func (s *StreamLogic) updatePlaylistInfo(ctx context.Context, stream app.Stream) (err error) {
+func (s *Stream) updatePlaylistInfo(ctx context.Context, stream app.Stream) (err error) {
 	if stream.Type != app.StreamTypePlaylist {
 		log.FromContext(ctx).Info("nothing to update")
 		return nil
@@ -105,7 +105,7 @@ func (s *StreamLogic) updatePlaylistInfo(ctx context.Context, stream app.Stream)
 	return nil
 }
 
-func (s *StreamLogic) makeItemsNotInPlaylist(playlist []app.PlaylistItem, videos []app.Video) (res []int64) {
+func (s *Stream) makeItemsNotInPlaylist(playlist []app.PlaylistItem, videos []app.Video) (res []int64) {
 	playlistMap := make(map[int64]bool, len(playlist))
 	for _, item := range playlist {
 		playlistMap[item.VideoId] = true
@@ -118,4 +118,8 @@ func (s *StreamLogic) makeItemsNotInPlaylist(playlist []app.PlaylistItem, videos
 		}
 	}
 	return res
+}
+
+func (s *Stream) GetActive(ctx context.Context) ([]app.Stream, error) {
+	return s.streamStorage.GetActive(ctx)
 }

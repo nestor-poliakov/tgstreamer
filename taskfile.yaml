@@ -2,16 +2,21 @@ version: "3"
 env:
   VIDEO: "https://www.youtube.com/watch?v=d-KxsdWX9xE"
   PLAYLIST: "https://www.youtube.com/playlist?list=PLjNlQ2vXx1xbt30X8TcUfNzw_akVISXEu"
+  TAG: "v1.0.0"
+  IMAGE: "nestorpoliakov/tgstreamer"
 tasks:
   run:
     desc: Run main.go
     cmds:
       - go run main.go --config=config/.local.yaml
-  docker:
+  build:
     desc: Build and run docker image
     cmds:
-      - docker build -t tgstreamer .
-      - docker run --name tgstreamer tgstreamer
+      - docker buildx build --platform linux/amd64 -t $IMAGE:$TAG .
+  push:
+    desc: Push docker image to registry
+    cmds:
+      - docker push $IMAGE:$TAG
   vinfo:
     desc: Get video info
     cmds:

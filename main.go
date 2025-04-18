@@ -45,7 +45,7 @@ func main() {
 		streamLogic   = logic.NewStream(streamPg, videoPg, playlistPg, youtube)
 	)
 
-	manager := streamer.NewManager(playlistLogic, videoLogic, streamPg, ytdlp)
+	manager := streamer.NewManager(playlistLogic, videoLogic, streamLogic, ytdlp)
 
 	manager.Run(ctx)
 	playlistLogic.Run(ctx)

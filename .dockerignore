@@ -1,0 +1,4 @@
+taskfile.yaml
+.env
+local
+config/.local.yaml

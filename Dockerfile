@@ -13,5 +13,5 @@ RUN apk add --no-cache ca-certificates
 WORKDIR /app
 COPY --from=builder /app/tgstreamer .
 COPY --from=builder /app/yt-dlp /bin
-EXPOSE 8080
+EXPOSE 8000
 CMD ["./tgstreamer"]

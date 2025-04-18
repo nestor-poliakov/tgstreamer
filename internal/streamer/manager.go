@@ -7,7 +7,6 @@ import (
 	"sync"
 	"tgstreamer/internal/app"
 	"tgstreamer/internal/logic"
-	"tgstreamer/internal/postgres"
 	"tgstreamer/internal/rpc"
 	"tgstreamer/lib/log"
 	"time"
@@ -18,17 +17,17 @@ type Manager struct {
 	downloader    *rpc.YtDlpClient
 	playlistLogic *logic.Playlist
 	videoLogic    *logic.Video
-	streamStorage postgres.Stream
+	streamLogic   *logic.Stream
 	wg            *sync.WaitGroup
 	stopFunc      func()
 }
 
-func NewManager(playlistLogic *logic.Playlist, videoLogic *logic.Video, streamStorage postgres.Stream, downloader *rpc.YtDlpClient) *Manager {
+func NewManager(playlistLogic *logic.Playlist, videoLogic *logic.Video, streamLogic *logic.Stream, downloader *rpc.YtDlpClient) *Manager {
 	m := &Manager{
 		streams:       make(map[int64]*stream),
 		playlistLogic: playlistLogic,
 		videoLogic:    videoLogic,
-		streamStorage: streamStorage,
+		streamLogic:   streamLogic,
 		downloader:    downloader,
 		wg:            &sync.WaitGroup{},
 		stopFunc:      func() {},
@@ -73,7 +72,7 @@ func (m *Manager) processingLoop(ctx context.Context) {
 
 func (m *Manager) updateStreams(ctx context.Context) error {
 	log.FromContext(ctx)
-	streams, err := m.streamStorage.GetActive(ctx)
+	streams, err := m.streamLogic.GetActive(ctx)
 	if err != nil {
 		return fmt.Errorf("get all streams: %w", err)
 	}
