@@ -9,14 +9,14 @@ import (
 type StreamType string
 
 var (
-	StreamTypePlaylist = "playlist"
+	StreamTypePlaylist StreamType = "playlist"
 )
 
 type Stream struct {
 	Id       int64
 	Name     string
 	IsActive bool
-	Type     string
+	Type     StreamType
 	Settings Settings
 }
 
@@ -25,6 +25,7 @@ type Settings struct {
 	TgChannelId  int64  `json:"tg_channel_id,omitempty"`
 	PlaylistCode string `json:"playlist_code,omitempty"`
 	Resolution   string `json:"resolution,omitempty"`
+	AudioBitrate int    `json:"audio_bitrate,omitempty"`
 }
 
 func (y *Settings) Scan(v any) error {

@@ -27,7 +27,7 @@ func main() {
 	ctx = pg.NewContext(ctx, pgConn)
 
 	var (
-		ytdlp        = rpc.NewYtDlpClient(conf.VideosDir)
+		ytdlp        = rpc.NewYtDlpClient(conf.VideosDir, conf.CookiesFile)
 		youtube      = rpc.NewYoutube(stopContext, conf.YoutubeApiKey)
 		sponsorBlock = rpc.NewSponsorBlock()
 		tg           = rpc.NewTelegram(conf.TgBotToken)

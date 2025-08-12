@@ -36,13 +36,25 @@ func (m *Playlist) processingLoop(ctx context.Context, wg *sync.WaitGroup) {
 	plii, video := m.getCurrent(ctx)
 	log.FromContexts(ctx).Debugf("current playlist item: %d", plii)
 	for {
-		select {
-		case <-ctx.Done():
+		err := m.processVideo(ctx, video)
+		if err != nil {
 			return
-		case m.toReader <- video:
 		}
 		plii, video = m.getNext(ctx, plii)
 		log.FromContexts(ctx).Debugf("next playlist item: %d", plii)
+	}
+}
+
+func (m *Playlist) processVideo(ctx context.Context, video app.Video) error {
+	if video.FileInfo.Error != "" {
+		log.FromContexts(ctx).With("error", video.FileInfo.Error, "video_id", video.Id).Info("not processing video with error")
+		return nil
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case m.toReader <- video:
+		return nil
 	}
 }
 

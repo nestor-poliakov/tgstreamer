@@ -17,12 +17,19 @@ type Video struct {
 
 type FileInfo struct {
 	Name          string `json:"name,omitempty"`
+	Error         string `json:"error,omitempty"`
 	DownloadedAt  int64  `json:"downloaded_at,omitempty"`
 	AudioChannels int    `json:"audio_channels,omitempty"`
 	Size          int    `json:"size,omitempty"`
 	Width         int    `json:"width,omitempty"`
 	Height        int    `json:"height,omitempty"`
-	Duration      int    `json:"duration,omitempty"`
+	DurationA     int    `json:"duration_a,omitempty"`
+	DurationV     int    `json:"duration_v,omitempty"`
+	AudioBitrate  int    `json:"audio_bitrate,omitempty"`
+	StartAudio    int    `json:"start_audio,omitempty"`
+	StartVideo    int    `json:"start_video,omitempty"`
+	EndAudio      int    `json:"end_audio,omitempty"`
+	EndVideo      int    `json:"end_video,omitempty"`
 	Fps           int    `json:"fps,omitempty"`
 }
 

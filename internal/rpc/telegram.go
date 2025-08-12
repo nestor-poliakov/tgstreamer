@@ -6,7 +6,6 @@ import (
 	"tgstreamer/internal/app"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	_ "gopkg.in/telebot.v4"
 )
 
 type Telegram struct {

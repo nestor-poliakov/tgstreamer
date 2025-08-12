@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path"
 
 	"os"
 	"strings"
@@ -66,7 +67,8 @@ func (r *Reader) processVideo(ctx context.Context, video app.Video) (err error) 
 	if len(video.FileInfo.Name) == 0 {
 		return fmt.Errorf("file name is empty")
 	}
-	if !strings.HasSuffix(video.FileInfo.Name, ".mp4") {
+
+	if path.Ext(video.FileInfo.Name) != ".mp4" {
 		return fmt.Errorf("unknown video format %q", video.FileInfo.Name)
 	}
 	reader, m, err := r.getMp4Reader(ctx, video.FileInfo.Name)
@@ -106,7 +108,7 @@ func (r *Reader) getMp4Reader(ctx context.Context, fileName string) (*io.PipeRea
 				return
 			}
 			if err != nil {
-				log.FromContexts(ctx).Errorf("read mp4 packet: %w", err)
+				log.FromContexts(ctx).With("error", err).Errorf("failed to read mp4 packet")
 				return
 			}
 			switch p.Cid {
@@ -247,6 +249,7 @@ func ConvertToMetadata(info gomp4.Mp4Info, tracks []gomp4.TrackInfo) flvio.AMFMa
 		{K: "audiosamplerate", V: float64(audioSampleRate)},
 		{K: "audiosamplesize", V: float64(audioSampleSize)},
 		{K: "stereo", V: stereo},
+		{K: "filesize", V: 0},
 		{K: "audiocodecid", V: float64(audioCodecId)},
 		{K: "major_brand", V: FourCCToString(info.MajorBrand)},
 		{K: "minor_version", V: float64(info.MinorVersion)},

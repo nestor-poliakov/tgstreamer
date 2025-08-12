@@ -72,7 +72,7 @@ func (v *Video) setDownloaded(ctx context.Context, downloaded infoUpdate) error 
 	if err != nil {
 		return fmt.Errorf("get video %d: %w", downloaded.id, err)
 	}
-	if video.FileInfo.Name == downloaded.info.Name {
+	if video.FileInfo.Name == downloaded.info.Name && downloaded.info.Error == "" {
 		return nil
 	}
 	err = v.videoStorage.AddFileInfo(ctx, video.Id, downloaded.info)

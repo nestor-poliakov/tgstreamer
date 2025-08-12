@@ -42,9 +42,6 @@ func (c *AdCutter) processingLoop(ctx context.Context, wg *sync.WaitGroup) {
 				return
 			}
 			p := c.processPiece(piece)
-			if len(p.packets) == 0 {
-				continue
-			}
 			select {
 			case <-ctx.Done():
 				return
@@ -57,8 +54,9 @@ func (c *AdCutter) processingLoop(ctx context.Context, wg *sync.WaitGroup) {
 }
 
 func (c *AdCutter) processPiece(piece piece) piece {
+	return piece
 	if piece.videoId != c.curVideoId {
-		c.segments = c.normalizeSegments(piece.Video.SbInfo.Segments, float64(piece.Video.FileInfo.Duration))
+		c.segments = c.normalizeSegments(piece.Video.SbInfo.Segments, float64(piece.Video.FileInfo.DurationV))
 		c.curVideoId = piece.videoId
 	}
 	if len(c.segments) == 0 {

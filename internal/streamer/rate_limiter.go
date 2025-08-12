@@ -22,7 +22,6 @@ func newRateLimiter() *rateLimiter {
 func (l *rateLimiter) Limit(p av.Packet) {
 	if pktTimeDiff := p.Time - l.pktTimeStart; pktTimeDiff > 0 {
 		wallTimeDiff := time.Now().Sub(l.wallTimeStart)
-		//pktTimeDiff += time.Millisecond * 50
 		if wallTimeDiff < pktTimeDiff && time.Since(l.start)-p.Time < time.Second/10 {
 			time.Sleep(pktTimeDiff - wallTimeDiff)
 		}

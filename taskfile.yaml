@@ -1,6 +1,8 @@
 version: "3"
+dotenv: [".env"]
 env:
-  VIDEO: "https://www.youtube.com/watch?v=d-KxsdWX9xE"
+  VIDEO_ID: d-KxsdWX9xE
+  VIDEO: "https://www.youtube.com/watch?v=0YF8vecQWYs"
   PLAYLIST: "https://www.youtube.com/playlist?list=PLjNlQ2vXx1xbt30X8TcUfNzw_akVISXEu"
   TAG: "v1.0.0"
   IMAGE: "nestorpoliakov/tgstreamer"
@@ -8,19 +10,27 @@ tasks:
   run:
     desc: Run main.go
     cmds:
-      - go run main.go --config=config/.local.yaml
+      - go run main.go
   build:
-    desc: Build and run docker image
+    desc: Build docker image
     cmds:
-      - docker buildx build --platform linux/amd64 -t $IMAGE:$TAG .
+      - docker buildx build --platform linux/amd64 -t $IMAGE:$TAG -t $IMAGE:latest .
   push:
     desc: Push docker image to registry
     cmds:
       - docker push $IMAGE:$TAG
+      - docker push $IMAGE:latest
+
+  download:
+    desc: Download video
+    cmds:
+      - yt-dlp --cookies ./cookies.txt -f mp4 --geo-bypass -o local/$VIDEO_ID.mp4 "https://www.youtube.com/watch?v=$VIDEO_ID"
+
   vinfo:
     desc: Get video info
     cmds:
-      - yt-dlp --dump-json "$VIDEO" > local/video_info.json
+      # - yt-dlp --dump-json "$VIDEO" > local/video_info.json
+      - yt-dlp -F "https://www.youtube.com/watch?v=95Mkwbsk2HQ"
 
   pinfo:
     desc: Get playlist info

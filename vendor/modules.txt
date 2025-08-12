@@ -83,16 +83,11 @@ github.com/hashicorp/errwrap
 github.com/hashicorp/go-multierror
 # github.com/jmoiron/sqlx v1.4.0
 ## explicit; go 1.10
-# github.com/kr/pretty v0.3.1
-## explicit; go 1.12
 # github.com/lib/pq v1.10.9
 ## explicit; go 1.13
 github.com/lib/pq
 github.com/lib/pq/oid
 github.com/lib/pq/scram
-# github.com/mitchellh/mapstructure v1.5.0
-## explicit; go 1.14
-github.com/mitchellh/mapstructure
 # github.com/nestor-poliakov/joy5 v0.0.0-20250406181521-54374d34636f
 ## explicit; go 1.24
 github.com/nestor-poliakov/joy5/av
@@ -103,8 +98,6 @@ github.com/nestor-poliakov/joy5/format/flv/flvio
 github.com/nestor-poliakov/joy5/format/rtmp
 github.com/nestor-poliakov/joy5/utils/bits
 github.com/nestor-poliakov/joy5/utils/bits/pio
-# github.com/rogpeppe/go-internal v1.13.1
-## explicit; go 1.22
 # github.com/yapingcat/gomedia v0.0.0-20240906162731-17feea57090c
 ## explicit; go 1.16
 github.com/yapingcat/gomedia/go-codec
@@ -321,11 +314,3 @@ google.golang.org/protobuf/types/gofeaturespb
 google.golang.org/protobuf/types/known/anypb
 google.golang.org/protobuf/types/known/durationpb
 google.golang.org/protobuf/types/known/timestamppb
-# gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
-## explicit; go 1.11
-# gopkg.in/telebot.v4 v4.0.0-beta.4
-## explicit; go 1.16
-gopkg.in/telebot.v4
-# gopkg.in/yaml.v3 v3.0.1
-## explicit
-gopkg.in/yaml.v3

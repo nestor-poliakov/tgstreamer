@@ -10,19 +10,29 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"tgstreamer/lib/log"
 )
 
 type YtDlpClient struct {
-	filesDir string
+	filesDir     string
+	cookiesFile  string
+	mu           sync.Mutex
+	lastDownload atomic.Value
 }
 
-func NewYtDlpClient(filesDir string) *YtDlpClient {
+func NewYtDlpClient(filesDir string, cookiesFile string) *YtDlpClient {
 	y := &YtDlpClient{
-		filesDir: filesDir,
+		filesDir:     filesDir,
+		cookiesFile:  cookiesFile,
+		mu:           sync.Mutex{},
+		lastDownload: atomic.Value{},
 	}
+	y.lastDownload.Store(time.Now().Add(-time.Minute / 2))
 	return y
 }
 
@@ -42,15 +52,28 @@ func (y *YtDlpClient) download(ctx context.Context, videoUrl string, fileName st
 		y.touch(ctx, fileName)
 		return fileName, nil
 	}
+	y.rateLimit(ctx)
 	log.FromContexts(ctx).Info("start downloading video " + videoUrl)
 	t := time.Now()
-	cmd := exec.CommandContext(ctx, "yt-dlp", "-f", "mp4", "--geo-bypass", "-o", fileName, videoUrl)
+	args := []string{"-f", "mp4",
+		"--user-agent", `"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"`,
+		"--geo-bypass",
+		"--limit-rate", "1M",
+		"--sleep-interval", "10",
+		"--max-sleep-interval", "20",
+		"-o", fileName,
+		videoUrl}
+	if y.cookiesFile != "" {
+		args = append([]string{"--cookies", y.cookiesFile}, args...)
+	}
+	cmd := exec.CommandContext(ctx, "yt-dlp", args...)
 	stdErr := bytes.NewBuffer(nil)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = io.MultiWriter(os.Stdout, stdErr)
 	err = cmd.Run()
 	if err != nil {
-		return "", fmt.Errorf("run command %q stderr: %s: %w", cmd.String(), stdErr.String(), err)
+		log.FromContexts(ctx).With("cmd", cmd.String(), "error", stdErr.String()).Error("exec command")
+		return "", fmt.Errorf("stdout: %s", stdErr.String())
 	}
 	info, err := os.Stat(fileName)
 	if err != nil {
@@ -61,11 +84,28 @@ func (y *YtDlpClient) download(ctx context.Context, videoUrl string, fileName st
 	return fileName, nil
 }
 
+func (y *YtDlpClient) rateLimit(ctx context.Context) {
+	if time.Since(y.lastDownload.Load().(time.Time)) < time.Minute {
+		log.FromContext(ctx).Info("rate limit download")
+		y.mu.Lock()
+		defer y.mu.Unlock()
+		t := time.NewTimer(time.Minute)
+		defer t.Stop()
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			y.lastDownload.Store(time.Now())
+		}
+	}
+}
+
 func (y *YtDlpClient) makeFileName(videoCode string) string {
+	videoCode = strings.ReplaceAll(videoCode, "\"", "")
 	return path.Join(y.filesDir, videoCode+".mp4")
 }
 
-func (y YtDlpClient) touch(ctx context.Context, fileName string) {
+func (y *YtDlpClient) touch(ctx context.Context, fileName string) {
 	err := os.Chtimes(fileName, time.Now(), time.Now())
 	if err != nil {
 		log.FromContexts(ctx).Errorf("failed to touch file %q: %v", fileName, err)
@@ -193,19 +233,23 @@ type VideoInfo struct {
 	Type                 string             `json:"_type"`
 	Version              Version            `json:"_version"`
 }
+
 type Fragments struct {
 	Url      string  `json:"url"`
 	Duration float64 `json:"duration"`
 }
+
 type HTTPHeaders struct {
 	UserAgent      string `json:"User-Agent"`
 	Accept         string `json:"Accept"`
 	AcceptLanguage string `json:"Accept-Language"`
 	SecFetchMode   string `json:"Sec-Fetch-Mode"`
 }
+
 type DownloaderOptions struct {
 	HttpChunkSize int `json:"http_chunk_size"`
 }
+
 type Formats struct {
 	FormatId           string            `json:"format_id"`
 	FormatNote         string            `json:"format_note,omitempty"`
@@ -245,6 +289,7 @@ type Formats struct {
 	Container          string            `json:"container,omitempty"`
 	DownloaderOptions  DownloaderOptions `json:"downloader_options,omitempty"`
 }
+
 type Thumbnails struct {
 	Url        string `json:"url"`
 	Preference int    `json:"preference"`
@@ -253,6 +298,7 @@ type Thumbnails struct {
 	Width      int    `json:"width,omitempty"`
 	Resolution string `json:"resolution,omitempty"`
 }
+
 type AutomaticCaptions struct{}
 
 type Subtitles struct{}
@@ -291,6 +337,7 @@ type RequestedFormats struct {
 	HttpHeaders        HTTPHeaders       `json:"http_headers"`
 	Format             string            `json:"format"`
 }
+
 type Version struct {
 	Version        string `json:"version"`
 	CurrentGitHead any    `json:"current_git_head"`

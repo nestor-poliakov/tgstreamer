@@ -46,6 +46,10 @@ func (s *Stream) playlistUpdateLoop(ctx context.Context) {
 	defer s.wg.Done()
 	t := time.NewTicker(time.Hour * 10)
 	defer t.Stop()
+	err := s.updatePlaylistsInfo(ctx)
+	if err != nil {
+		log.FromContext(ctx).Error("update playlist info", "error", err)
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -64,6 +68,7 @@ func (s *Stream) updatePlaylistsInfo(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("get active streams: %w", err)
 	}
+	log.FromContexts(ctx).Infof("%d streams to update", len(streams))
 	for _, stream := range streams {
 		ctx := log.With(ctx, "stream_id", stream.Id)
 		err := s.updatePlaylistInfo(ctx, stream)

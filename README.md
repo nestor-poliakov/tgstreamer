@@ -14,11 +14,13 @@ Infinite stream to telegram channel with videos from YouTube
 - [x] send video cover to channel when it starts
 - [x] form playlist from youtube playlists
 - [x] filter video by resolution
-- [ ] form playlist from youtube channels
-- [ ] cut ad using data from SponsorBlock
+- [x] BUG if 1 video occurs multiple times in a row in playlist, rate limiter not working
+- [x] form playlist from youtube channels
+- [x] cut ad using data from SponsorBlock
 - [ ] predownloading videos before streaming pipeline
 - [ ] vote for skipping video
-- [ ] better video quality by downloading video and audio separately and read them simultaneously
+- [ ] BUG ad cutter not working
+- [ ] better video quality
 - [ ] make video playlist automatically with new videos by list of youtube channels
 - [ ] receive suggestions about new videos
 - [ ] make list of future videos

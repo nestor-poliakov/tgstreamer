@@ -20,6 +20,9 @@ func (Playlist) Create(ctx context.Context, videoId int64, streamId int64) error
 }
 
 func (Playlist) CreateList(ctx context.Context, videoIds []int64, streamId int64) error {
+	if len(videoIds) == 0 {
+		return nil
+	}
 	vals := make([]any, len(videoIds)*2)
 	qs := make([]string, len(videoIds))
 	for i := range videoIds {

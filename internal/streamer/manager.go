@@ -71,7 +71,7 @@ func (m *Manager) processingLoop(ctx context.Context) {
 }
 
 func (m *Manager) updateStreams(ctx context.Context) error {
-	log.FromContext(ctx)
+	log.FromContext(ctx).Info("start updateing streams")
 	streams, err := m.streamLogic.GetActive(ctx)
 	if err != nil {
 		return fmt.Errorf("get all streams: %w", err)
@@ -100,7 +100,7 @@ func (m *Manager) updateStreams(ctx context.Context) error {
 		toStop = append(toStop, strm.Id)
 		toRun = append(toRun, strm)
 	}
-
+	log.FromContexts(ctx).Infof("%d streams to stop; %d streams to start", len(toStop), len(toRun))
 	for _, id := range toStop {
 		m.stopStream(ctx, id)
 	}
@@ -116,14 +116,15 @@ func (m *Manager) runStream(ctx context.Context, strm app.Stream) {
 	toAdCutter := make(chan piece, 0)
 	toStreamer := make(chan piece, 20)
 	s := &stream{
-		stream:     strm,
-		playlist:   NewPlaylist(toDownloader, strm, m.playlistLogic),
-		downloader: NewDownloader(toDownloader, toReader, m.downloader, m.videoLogic, strm.Settings.Resolution),
-		reader:     NewReader(toReader, toAdCutter),
-		adCutter:   NewAdCutter(toAdCutter, toStreamer),
-		streamer:   NewStreamer(toStreamer, strm, m.playlistLogic),
-		wg:         &sync.WaitGroup{},
-		stopFunc:   func() {},
+		stream:   strm,
+		playlist: NewPlaylist(toDownloader, strm, m.playlistLogic),
+		downloader: NewDownloader(toDownloader, toReader, m.downloader, m.videoLogic,
+			strm.Settings.Resolution, strm.Settings.AudioBitrate),
+		reader:   NewReader(toReader, toAdCutter),
+		adCutter: NewAdCutter(toAdCutter, toStreamer),
+		streamer: NewStreamer(toStreamer, strm, m.playlistLogic),
+		wg:       &sync.WaitGroup{},
+		stopFunc: func() {},
 	}
 	s.Run(ctx)
 	m.streams[s.stream.Id] = s
@@ -150,6 +151,7 @@ type stream struct {
 
 func (s *stream) Run(ctx context.Context) {
 	ctx = log.With(ctx, "stream_id", s.stream.Id)
+	log.FromContexts(ctx).Infof("start stream with config %+v", s.stream.Settings)
 	ctx, s.stopFunc = context.WithCancel(ctx)
 	s.playlist.Run(ctx, s.wg)
 	s.downloader.Run(ctx, s.wg)

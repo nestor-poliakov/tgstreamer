@@ -9,25 +9,28 @@ import (
 	"tgstreamer/internal/logic"
 	"tgstreamer/internal/rpc"
 	"tgstreamer/lib/log"
+	"time"
 
 	"github.com/yapingcat/gomedia/go-mp4"
 )
 
 type Downloader struct {
-	resolution string
-	downloader *rpc.YtDlpClient
-	videoLogic *logic.Video
-	from       <-chan app.Video
-	to         chan<- app.Video
+	resolution   string
+	audioBitrate int
+	downloader   *rpc.YtDlpClient
+	videoLogic   *logic.Video
+	from         <-chan app.Video
+	to           chan<- app.Video
 }
 
-func NewDownloader(from <-chan app.Video, to chan<- app.Video, downloader *rpc.YtDlpClient, videoLogic *logic.Video, resolution string) *Downloader {
+func NewDownloader(from <-chan app.Video, to chan<- app.Video, downloader *rpc.YtDlpClient, videoLogic *logic.Video, resolution string, audioBitrate int) *Downloader {
 	return &Downloader{
-		from:       from,
-		to:         to,
-		downloader: downloader,
-		videoLogic: videoLogic,
-		resolution: resolution,
+		from:         from,
+		to:           to,
+		downloader:   downloader,
+		videoLogic:   videoLogic,
+		resolution:   resolution,
+		audioBitrate: audioBitrate,
 	}
 }
 
@@ -66,6 +69,10 @@ func (d *Downloader) downloadingLoop(ctx context.Context, wg *sync.WaitGroup) {
 func (d *Downloader) download(ctx context.Context, video app.Video) (app.Video, error) {
 	fileName, err := d.downloader.DownloadYt(ctx, video.Code)
 	if err != nil {
+		d.videoLogic.SetDownloaded(video.Id, app.FileInfo{
+			DownloadedAt: time.Now().Unix(),
+			Error:        err.Error(),
+		})
 		return video, fmt.Errorf("download video: %w", err)
 	}
 	video.FileInfo, err = d.getInfo(ctx, fileName)
@@ -76,10 +83,17 @@ func (d *Downloader) download(ctx context.Context, video app.Video) (app.Video, 
 	if d.resolution != "" && d.resolution != fmt.Sprintf("%dx%d", video.FileInfo.Width, video.FileInfo.Height) {
 		return video, fmt.Errorf("resolution not allowed")
 	}
+	if d.audioBitrate != 0 && d.audioBitrate != video.FileInfo.AudioBitrate {
+		return video, fmt.Errorf("audio bitrate not allowed")
+	}
+	if video.FileInfo.AudioChannels != 2 {
+		return video, fmt.Errorf("audio channels not 2")
+	}
 	return video, nil
 }
 
 func (d *Downloader) getInfo(ctx context.Context, fileName string) (info app.FileInfo, err error) {
+	info.DownloadedAt = time.Now().Unix()
 	info.Name = fileName
 	f, err := os.Open(fileName)
 	if err != nil {
@@ -99,14 +113,23 @@ func (d *Downloader) getInfo(ctx context.Context, fileName string) (info app.Fil
 		switch track.Cid {
 		case mp4.MP4_CODEC_AAC:
 			info.AudioChannels = int(track.ChannelCount)
+			info.AudioBitrate = int(track.SampleRate)
+			if track.Duration > 0 && track.Timescale > 0 {
+				durSec := float64(track.Duration) / float64(track.Timescale)
+				info.DurationA = int(durSec)
+			}
+			info.StartAudio = int(track.StartDts)
+			info.EndAudio = int(track.EndDts)
 		case mp4.MP4_CODEC_H264:
 			info.Width = int(track.Width)
 			info.Height = int(track.Height)
 			if track.Duration > 0 && track.Timescale > 0 {
 				durationSec := float64(track.Duration) / float64(track.Timescale)
 				info.Fps = int(float64(track.SampleCount) / durationSec)
-				info.Duration = int(durationSec)
+				info.DurationV = int(durationSec)
 			}
+			info.StartVideo = int(track.StartDts)
+			info.EndVideo = int(track.EndDts)
 		}
 	}
 	return info, nil
