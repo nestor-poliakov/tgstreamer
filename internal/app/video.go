@@ -7,7 +7,8 @@ import (
 )
 
 type Video struct {
-	Id        int64
+	Id int64
+	// youtube video id
 	Code      string
 	CreatedAt int64
 	FileInfo  FileInfo

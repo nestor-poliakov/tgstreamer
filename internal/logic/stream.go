@@ -81,10 +81,43 @@ func (s *Stream) updatePlaylistsInfo(ctx context.Context) error {
 }
 
 func (s *Stream) updatePlaylistInfo(ctx context.Context, stream app.Stream) (err error) {
-	if stream.Type != app.StreamTypePlaylist {
-		log.FromContext(ctx).Info("nothing to update")
-		return nil
+	switch stream.Type {
+	case app.StreamTypePlaylist:
+		return s.updatePlaylistForPlaylist(ctx, stream)
+	case app.StreamTypeChannel:
+		return s.updatePlaylistForChannel(ctx, stream)
+	default:
+		return fmt.Errorf("unknown stream type %q", stream.Type)
 	}
+}
+
+func (s *Stream) updatePlaylistForChannel(ctx context.Context, stream app.Stream) (err error) {
+	if stream.Settings.ChannelCode == "" {
+		return fmt.Errorf("channel code is empty")
+	}
+	videos, err := s.youtube.GetChannelVideos(ctx, stream.Settings.ChannelCode)
+	if err != nil {
+		return fmt.Errorf("get channel items from youtube: %w", err)
+	}
+	log.FromContexts(ctx).Infof("%d videos found in youtube channel", len(videos))
+	videos, err = s.videoStorage.CreateList(ctx, videos)
+	if err != nil {
+		return fmt.Errorf("create videos: %w", err)
+	}
+	curPlaylist, err := s.playlistStorage.GetForStream(ctx, stream.Id)
+	if err != nil {
+		return fmt.Errorf("get playlist for stream: %w", err)
+	}
+	itemsToCreate := s.makeItemsNotInPlaylist(curPlaylist, videos)
+	log.FromContexts(ctx).Infof("%d items to add to playlist", len(itemsToCreate))
+	err = s.playlistStorage.CreateList(ctx, itemsToCreate, stream.Id)
+	if err != nil {
+		return fmt.Errorf("add videos to playlist: %w", err)
+	}
+	return nil
+}
+
+func (s *Stream) updatePlaylistForPlaylist(ctx context.Context, stream app.Stream) (err error) {
 	if stream.Settings.PlaylistCode == "" {
 		return fmt.Errorf("playlist code is empty")
 	}

@@ -23,9 +23,9 @@ Known Problems:
 - [x] form playlist from youtube playlists
 - [x] filter video by resolution
 - [x] BUG if 1 video occurs multiple times in a row in playlist, rate limiter not working
-- [x] form playlist from youtube channels
+- [x] form playlist from youtube channel
 - [x] cut ad using data from SponsorBlock
-- [ ] predownloading videos before streaming pipeline
+- [x] ~~predownloading videos before streaming pipeline~~
 - [ ] vote for skipping video
 - [ ] BUG ad cutter not working
 - [ ] better video quality

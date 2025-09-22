@@ -22,9 +22,13 @@ type Stream struct {
 }
 
 type Settings struct {
-	Url          string `json:"url,omitempty"`
-	TgChannelId  int64  `json:"tg_channel_id,omitempty"`
+	Url         string `json:"url,omitempty"`
+	TgChannelId int64  `json:"tg_channel_id,omitempty"`
+	// youtube playlist id
 	PlaylistCode string `json:"playlist_code,omitempty"`
+	// youtube channel id
+	ChannelCode string `json:"channel_code,omitempty"`
+	//WxH
 	Resolution   string `json:"resolution,omitempty"`
 	AudioBitrate int    `json:"audio_bitrate,omitempty"`
 }
