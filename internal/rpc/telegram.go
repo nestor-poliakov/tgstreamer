@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"tgstreamer/internal/app"
+	"tgstreamer/lib/log"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -17,6 +18,7 @@ func NewTelegram(token string) *Telegram {
 	if err != nil {
 		panic(err)
 	}
+	log.Defaults().Infof("new tg bot client @%s", bot.Self.UserName)
 	return &Telegram{
 		client: bot,
 	}

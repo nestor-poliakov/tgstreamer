@@ -73,6 +73,41 @@ func (y *Youtube) GetPlaylist(ctx context.Context, playlistId string) (videos []
 	return videos, nil
 }
 
+func (y *Youtube) GetChannelVideos(ctx context.Context, channelId string) (videos []app.Video, err error) {
+	resp, err := y.service.Channels.List([]string{"snippet,contentDetails"}).
+		Id(channelId).
+		Do()
+
+	if err != nil {
+		return nil, fmt.Errorf("get channel info: %w", err)
+	}
+	if len(resp.Items) == 0 {
+		return nil, fmt.Errorf("channel %q not found", channelId)
+	}
+	playlistId := resp.Items[0].ContentDetails.RelatedPlaylists.Uploads
+	videos, err = y.GetPlaylist(ctx, playlistId)
+	if err != nil {
+		return nil, fmt.Errorf("get playlist: %w", err)
+	}
+	return videos, nil
+}
+
+func (y *Youtube) SearchChannel(ctx context.Context, q string) (string, error) {
+	resp, err := y.service.Search.List([]string{"snippet"}).
+		Q(q).
+		Type("channel").
+		MaxResults(1).
+		Do()
+
+	if err != nil {
+		return "", fmt.Errorf("search channel: %w", err)
+	}
+	if len(resp.Items) == 0 {
+		return "", fmt.Errorf("channel %q not found", q)
+	}
+	return resp.Items[0].Id.ChannelId, nil
+}
+
 func (y *Youtube) toVideoCodes(items []*youtube.PlaylistItem) []app.Video {
 	res := make([]app.Video, 0, len(items))
 	for _, item := range items {

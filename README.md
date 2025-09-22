@@ -1,6 +1,14 @@
 # Tg Streamer
 Infinite stream to telegram channel with videos from YouTube
 
+Working example: [@anime_openings_stream](https://t.me/anime_openings_stream)
+
+Known Problems:
+- When no one watching strem for some time, telegram shut down processing, but still reads packets from connection, and some times it is not starting processing, so there is no stream on client side.
+- Change in video resolution, number of audio channels or audio bitrate breaks the stream, so it needs to reconnect.
+  Solution: filter videos by resolution and number of channels.
+-
+
 - [x] download videos with yt-dlp
 - [x] stream one flv file
 - [x] stream multiple files one by one

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os/signal"
 	"syscall"
 	"tgstreamer/internal/app"
@@ -20,7 +19,6 @@ func main() {
 	defer stopFunc()
 	ctx := context.Background()
 	conf := app.ReadConfig()
-	fmt.Printf("%+v\n", conf)
 
 	pg.Migrate(postgres.Migrations, conf.Pg)
 	pgConn := pg.NewConn(stopContext, conf.Pg.Dsn)
@@ -52,6 +50,7 @@ func main() {
 	videoLogic.Run(ctx)
 	streamLogic.Run(ctx)
 
+	log.Default().Info("service started")
 	<-stopContext.Done()
 	log.Default().Info("stop signal received")
 	manager.Stop()

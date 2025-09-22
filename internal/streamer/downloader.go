@@ -95,15 +95,17 @@ func (d *Downloader) download(ctx context.Context, video app.Video) (app.Video, 
 func (d *Downloader) getInfo(ctx context.Context, fileName string) (info app.FileInfo, err error) {
 	info.DownloadedAt = time.Now().Unix()
 	info.Name = fileName
-	f, err := os.Open(fileName)
-	if err != nil {
-		return info, fmt.Errorf("open file: %w", err)
-	}
+
 	fileInfo, err := os.Stat(fileName)
 	if err != nil {
 		return info, fmt.Errorf("stat file: %w", err)
 	}
 	info.Size = int(fileInfo.Size())
+
+	f, err := os.Open(fileName)
+	if err != nil {
+		return info, fmt.Errorf("open file: %w", err)
+	}
 	defer f.Close()
 	tracks, err := mp4.CreateMp4Demuxer(f).ReadHead()
 	if err != nil {

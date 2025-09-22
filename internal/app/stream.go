@@ -10,6 +10,7 @@ type StreamType string
 
 var (
 	StreamTypePlaylist StreamType = "playlist"
+	StreamTypeChannel  StreamType = "channel"
 )
 
 type Stream struct {

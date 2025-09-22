@@ -36,7 +36,7 @@ func NewYtDlpClient(filesDir string, cookiesFile string) *YtDlpClient {
 	return y
 }
 
-func (y *YtDlpClient) DownloadYt(ctx context.Context, videoCode string) (string, error) {
+func (y *YtDlpClient) DownloadYt(ctx context.Context, videoCode string) (fileName string, err error) {
 	return y.download(ctx, "https://www.youtube.com/watch?"+url.Values{"v": {videoCode}}.Encode(), y.makeFileName(videoCode))
 }
 

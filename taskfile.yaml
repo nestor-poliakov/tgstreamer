@@ -6,6 +6,7 @@ env:
   PLAYLIST: "https://www.youtube.com/playlist?list=PLjNlQ2vXx1xbt30X8TcUfNzw_akVISXEu"
   TAG: "v1.0.0"
   IMAGE: "nestorpoliakov/tgstreamer"
+  CHAN_LINK: "https://youtube.com/@zeddotdev"
 tasks:
   run:
     desc: Run main.go
@@ -36,3 +37,8 @@ tasks:
     desc: Get playlist info
     cmds:
       - yt-dlp --dump-json "$PLAYLIST" > local/playlist_info.json
+
+  channel:
+    desc: Get channel id by url
+    cmds:
+      - go run cmd/find-yt-chan-id.go
