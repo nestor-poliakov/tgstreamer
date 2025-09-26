@@ -1,8 +1,18 @@
-# Tg Streamer
-Infinite stream to telegram channel with videos from YouTube
+# TgStreamer
 
-Working example: [@anime_openings_stream](https://t.me/anime_openings_stream)
+**YouTube-to-Telegram Live Streaming Service**
 
+Continuously stream videos from YouTube playlists and channels directly into your Telegram channels.
+
+Key features:
+- Playlist forms from YouTube playlists or channels
+- Automatic video downloading via yt-dlp
+- Ad removal with SponsorBlock integration
+- Support for multiple simultaneous streams
+- Automatic announcements for new videos
+- User voting system to skip videos
+
+**Live Example**: [@anime_openings_stream](https://t.me/anime_openings_stream)
 
 ## Known Problems
 - When no one watching stream for some time, telegram shut down processing, but still reads packets from connection. When someone joins the steam, it is not starting processing, so there is no stream on client side.
