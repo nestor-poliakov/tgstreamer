@@ -15,24 +15,29 @@ import (
 )
 
 type Streamer struct {
-	playlistLogic *logic.Playlist
-	url           string
-	client        *rtmp.Client
-	conn          *rtmp.Conn
-	nconn         net.Conn
-	rl            *rateLimiter
-	configs       []av.Packet
-	ch            <-chan piece
-	curVideoId    int64
-	skip          bool
+	playlistLogic     *logic.Playlist
+	play              *logic.Play
+	stream            app.Stream
+	client            *rtmp.Client
+	conn              *rtmp.Conn
+	nconn             net.Conn
+	rl                *rateLimiter
+	configs           []av.Packet
+	ch                <-chan piece
+	toSkip            chan int64
+	curVideoId        int64
+	curPlaylistItemId int64
+	skip              bool
 }
 
-func NewStreamer(ch <-chan piece, stream app.Stream, playlistLogic *logic.Playlist) *Streamer {
+func NewStreamer(ch <-chan piece, stream app.Stream, playlistLogic *logic.Playlist, play *logic.Play) *Streamer {
 	return &Streamer{
 		playlistLogic: playlistLogic,
-		url:           stream.Settings.Url,
+		play:          play,
+		stream:        stream,
 		client:        rtmp.NewClient(),
 		ch:            ch,
+		toSkip:        make(chan int64, 1),
 		rl:            newRateLimiter(),
 		configs:       make([]av.Packet, 0, 3),
 	}
@@ -42,23 +47,26 @@ func (s *Streamer) connect() (err error) {
 	if s.nconn != nil {
 		s.nconn.Close()
 	}
-	if s.url == "" {
+	if s.stream.Settings.Url == "" {
 		return fmt.Errorf("empty streaming url")
 	}
-	s.conn, s.nconn, err = s.client.Dial(s.url, rtmp.PrepareWriting)
+	s.conn, s.nconn, err = s.client.Dial(s.stream.Settings.Url, rtmp.PrepareWriting)
 	if err != nil {
-		return fmt.Errorf("failed to connect to rtmp server %q: %w", s.url, err)
+		return fmt.Errorf("failed to connect to rtmp server %q: %w", s.stream.Settings.Url, err)
 	}
 	return nil
 }
 
 func (s *Streamer) Run(ctx context.Context, wg *sync.WaitGroup) {
-
 	ctx = log.With(ctx, "worker", "streamer")
 	s.reconnect(ctx)
 	s.skip = false
 	wg.Add(1)
 	go s.streamingLoop(ctx, wg)
+}
+
+func (s *Streamer) Skip(playlistItemId int64) {
+	s.toSkip <- playlistItemId
 }
 
 func (s *Streamer) streamingLoop(ctx context.Context, wg *sync.WaitGroup) {
@@ -70,15 +78,18 @@ func (s *Streamer) streamingLoop(ctx context.Context, wg *sync.WaitGroup) {
 		select {
 		case <-ctx.Done():
 			return
+		case playlistItemId := <-s.toSkip:
+			if s.curPlaylistItemId == playlistItemId {
+				s.skip = true
+			}
 		case piece, ok := <-s.ch:
 			if !ok {
 				return
 			}
-			vctx := log.With(ctx, "video_id", piece.videoId)
+			vctx := log.With(ctx, "video_id", piece.video.Id, "playlist_item_id", piece.playlistItemId)
 			err := s.processPackets(vctx, piece)
 			if err != nil {
 				log.FromContexts(vctx).With("error", err).Errorf("process %d packets", len(piece.packets))
-				continue
 			}
 		}
 	}
@@ -86,16 +97,19 @@ func (s *Streamer) streamingLoop(ctx context.Context, wg *sync.WaitGroup) {
 
 func (s *Streamer) processPackets(ctx context.Context, piece piece) error {
 	// Check if this is a new video or a restart of the same video
-	isNewVideoInstance := piece.videoId != s.curVideoId ||
+	isNewVideoInstance := piece.video.Id != s.curVideoId ||
 		(len(piece.packets) > 0 && piece.packets[0].Type == av.Metadata)
 
 	if isNewVideoInstance {
-		s.playlistLogic.SetCurrent(piece.videoId)
+		s.playlistLogic.SetCurrent(piece.playlistItemId)
+		s.play.Announce(piece.playlistItemId)
+
 		s.rl = newRateLimiter()
 		s.configs = s.configs[:0]
-		s.curVideoId = piece.videoId
+		s.curVideoId = piece.video.Id
+		s.curPlaylistItemId = piece.playlistItemId
 		s.skip = false
-		log.FromContexts(ctx).Infof("start streaming new video %d", piece.videoId)
+		log.FromContexts(ctx).Infof("start streaming new video %d", piece.video.Id)
 	}
 	if len(piece.packets) == 0 {
 		return nil

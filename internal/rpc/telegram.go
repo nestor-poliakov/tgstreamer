@@ -3,6 +3,7 @@ package rpc
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"tgstreamer/internal/app"
 	"tgstreamer/lib/log"
 
@@ -24,27 +25,40 @@ func NewTelegram(token string) *Telegram {
 	}
 }
 
-func (c *Telegram) Announce(ctx context.Context, chatId int64, video app.Video) error {
-	// like := "like_" + strconv.FormatInt(video.Id, 10)
-	// skip := "skip_" + strconv.FormatInt(video.Id, 10)
-	_, err := c.client.Send(tgbotapi.PhotoConfig{
+func (t *Telegram) GetUpdatesChan() tgbotapi.UpdatesChannel {
+	return t.client.GetUpdatesChan(tgbotapi.UpdateConfig{})
+}
+
+func (c *Telegram) Announce(ctx context.Context, settings app.Settings, video app.Video, playId int64) (int64, error) {
+	buttons := []tgbotapi.InlineKeyboardButton{}
+	if settings.WithLikeButton {
+		like := "like:" + strconv.FormatInt(playId, 10)
+		buttons = append(buttons, tgbotapi.InlineKeyboardButton{
+			Text:         "Like",
+			CallbackData: &like,
+		})
+	}
+	if settings.WithSkipButton {
+		skip := "skip:" + strconv.FormatInt(playId, 10)
+		buttons = append(buttons, tgbotapi.InlineKeyboardButton{
+			Text:         "Skip",
+			CallbackData: &skip,
+		})
+	}
+	var markup any
+	if len(buttons) > 0 {
+		markup = tgbotapi.InlineKeyboardMarkup{
+			InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{
+				buttons,
+			},
+		}
+	}
+
+	msg, err := c.client.Send(tgbotapi.PhotoConfig{
 		BaseFile: tgbotapi.BaseFile{
 			BaseChat: tgbotapi.BaseChat{
-				ChatID: chatId,
-				// ReplyMarkup: tgbotapi.InlineKeyboardMarkup{
-				// 	InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{
-				// 		{
-				// 			tgbotapi.InlineKeyboardButton{
-				// 				Text:         "Like",
-				// 				CallbackData: &like,
-				// 			},
-				// 			tgbotapi.InlineKeyboardButton{
-				// 				Text:         "Skip",
-				// 				CallbackData: &skip,
-				// 			},
-				// 		},
-				// 	},
-				// },
+				ChatID:      settings.TgChannelId,
+				ReplyMarkup: markup,
 			},
 			File: tgbotapi.FileURL(video.YtInfo.Thumbnail),
 		},
@@ -53,5 +67,13 @@ func (c *Telegram) Announce(ctx context.Context, chatId int64, video app.Video) 
 		ParseMode:       "html",
 		CaptionEntities: nil,
 	})
+	if err != nil {
+		return 0, fmt.Errorf("send announce message to channel: %w", err)
+	}
+	return int64(msg.MessageID), nil
+}
+
+func (c *Telegram) Callback(ctx context.Context, callbackId, text string) error {
+	_, err := c.client.Request(tgbotapi.NewCallback(callbackId, text))
 	return err
 }

@@ -25,12 +25,11 @@ tasks:
   download:
     desc: Download video
     cmds:
-      - yt-dlp --cookies ./cookies.txt -f mp4 --geo-bypass -o local/$VIDEO_ID.mp4 "https://www.youtube.com/watch?v=$VIDEO_ID"
+      - yt-dlp --cookies ./local/cookies.txt -f mp4 --geo-bypass -o local/$VIDEO_ID.mp4 "https://www.youtube.com/watch?v=$VIDEO_ID"
 
   vinfo:
     desc: Get video info
     cmds:
-      # - yt-dlp --dump-json "$VIDEO" > local/video_info.json
       - yt-dlp -F "https://www.youtube.com/watch?v=95Mkwbsk2HQ"
 
   pinfo:

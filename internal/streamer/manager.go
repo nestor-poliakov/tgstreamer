@@ -13,21 +13,25 @@ import (
 )
 
 type Manager struct {
-	streams       map[int64]*stream
+	mu      sync.Mutex
+	streams map[int64]*stream
+
 	downloader    *rpc.YtDlpClient
 	playlistLogic *logic.Playlist
 	videoLogic    *logic.Video
 	streamLogic   *logic.Stream
+	playLogic     *logic.Play
 	wg            *sync.WaitGroup
 	stopFunc      func()
 }
 
-func NewManager(playlistLogic *logic.Playlist, videoLogic *logic.Video, streamLogic *logic.Stream, downloader *rpc.YtDlpClient) *Manager {
+func NewManager(playlistLogic *logic.Playlist, videoLogic *logic.Video, streamLogic *logic.Stream, playLogic *logic.Play, downloader *rpc.YtDlpClient) *Manager {
 	m := &Manager{
 		streams:       make(map[int64]*stream),
 		playlistLogic: playlistLogic,
 		videoLogic:    videoLogic,
 		streamLogic:   streamLogic,
+		playLogic:     playLogic,
 		downloader:    downloader,
 		wg:            &sync.WaitGroup{},
 		stopFunc:      func() {},
@@ -39,6 +43,8 @@ func (m *Manager) Run(ctx context.Context) {
 	ctx, m.stopFunc = context.WithCancel(ctx)
 	m.wg.Add(1)
 	go m.processingLoop(ctx)
+	m.wg.Add(1)
+	go m.skipperLoop(ctx)
 }
 
 func (m *Manager) Stop() {
@@ -46,7 +52,42 @@ func (m *Manager) Stop() {
 	m.wg.Wait()
 }
 
+func (m *Manager) skipperLoop(ctx context.Context) {
+	ctx = log.With(ctx, "worker", "manager_skipper")
+	defer log.FromContexts(ctx).Info("ended")
+	defer m.wg.Done()
+	ch := m.playLogic.GetToSkipChan()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case playToSkip := <-ch:
+			err := m.skipPlay(ctx, playToSkip)
+			if err != nil {
+				log.FromContexts(ctx).With("error", err).Errorf("failed to skip play %v", playToSkip)
+			}
+		}
+	}
+}
+
+func (m *Manager) skipPlay(ctx context.Context, play app.Play) error {
+	log.FromContexts(ctx).Infof("skipping play %+v", play)
+	playlistItem, err := m.playlistLogic.Get(ctx, play.PlaylistItemId)
+	if err != nil {
+		return fmt.Errorf("get playlist item: %w", err)
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	streamer, ok := m.streams[playlistItem.StreamId]
+	if !ok {
+		return fmt.Errorf("streamer %d not active", playlistItem.StreamId)
+	}
+	streamer.Skip(playlistItem.Id)
+	return nil
+}
+
 func (m *Manager) processingLoop(ctx context.Context) {
+	ctx = log.With(ctx, "worker", "manager_updater")
 	defer m.wg.Done()
 	err := m.updateStreams(ctx)
 	if err != nil {
@@ -71,11 +112,13 @@ func (m *Manager) processingLoop(ctx context.Context) {
 }
 
 func (m *Manager) updateStreams(ctx context.Context) error {
-	log.FromContext(ctx).Info("start updateing streams")
+	log.FromContext(ctx).Info("start updating streams")
 	streams, err := m.streamLogic.GetActive(ctx)
 	if err != nil {
 		return fmt.Errorf("get all streams: %w", err)
 	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	toStop := make([]int64, 0)
 	toRun := make([]app.Stream, 0)
 	streamsMap := map[int64]bool{}
@@ -111,21 +154,7 @@ func (m *Manager) updateStreams(ctx context.Context) error {
 }
 
 func (m *Manager) runStream(ctx context.Context, strm app.Stream) {
-	toDownloader := make(chan app.Video, 0)
-	toReader := make(chan app.Video, 0)
-	toAdCutter := make(chan piece, 0)
-	toStreamer := make(chan piece, 20)
-	s := &stream{
-		stream:   strm,
-		playlist: NewPlaylist(toDownloader, strm, m.playlistLogic),
-		downloader: NewDownloader(toDownloader, toReader, m.downloader, m.videoLogic,
-			strm.Settings.Resolution, strm.Settings.AudioBitrate),
-		reader:   NewReader(toReader, toAdCutter),
-		adCutter: NewAdCutter(toAdCutter, toStreamer),
-		streamer: NewStreamer(toStreamer, strm, m.playlistLogic),
-		wg:       &sync.WaitGroup{},
-		stopFunc: func() {},
-	}
+	s := newStream(strm, m.playlistLogic, m.videoLogic, m.playLogic, m.downloader)
 	s.Run(ctx)
 	m.streams[s.stream.Id] = s
 }
@@ -136,31 +165,4 @@ func (m *Manager) stopStream(ctx context.Context, id int64) {
 		s.Stop()
 		delete(m.streams, id)
 	}
-}
-
-type stream struct {
-	stream     app.Stream
-	playlist   *Playlist
-	downloader *Downloader
-	reader     *Reader
-	adCutter   *AdCutter
-	streamer   *Streamer
-	wg         *sync.WaitGroup
-	stopFunc   func()
-}
-
-func (s *stream) Run(ctx context.Context) {
-	ctx = log.With(ctx, "stream_id", s.stream.Id)
-	log.FromContexts(ctx).Infof("start stream with config %+v", s.stream.Settings)
-	ctx, s.stopFunc = context.WithCancel(ctx)
-	s.playlist.Run(ctx, s.wg)
-	s.downloader.Run(ctx, s.wg)
-	s.reader.Run(ctx, s.wg)
-	s.adCutter.Run(ctx, s.wg)
-	s.streamer.Run(ctx, s.wg)
-}
-
-func (s *stream) Stop() {
-	s.stopFunc()
-	s.wg.Wait()
 }

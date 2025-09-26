@@ -178,7 +178,7 @@ func (v *Video) getSbInfo(ctx context.Context) error {
 
 func (v *Video) deletingLoop(ctx context.Context) {
 	defer v.wg.Done()
-	ticker := time.NewTicker(time.Hour)
+	ticker := time.NewTicker(24 * time.Hour)
 	defer ticker.Stop()
 	for {
 		select {

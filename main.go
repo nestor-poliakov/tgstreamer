@@ -9,6 +9,7 @@ import (
 	"tgstreamer/internal/postgres"
 	"tgstreamer/internal/rpc"
 	"tgstreamer/internal/streamer"
+	"tgstreamer/internal/telegram"
 	"tgstreamer/lib/log"
 	"tgstreamer/lib/pg"
 )
@@ -17,6 +18,7 @@ func main() {
 	stopContext := context.Background()
 	stopContext, stopFunc := signal.NotifyContext(stopContext, syscall.SIGINT, syscall.SIGTERM)
 	defer stopFunc()
+
 	ctx := context.Background()
 	conf := app.ReadConfig()
 
@@ -35,26 +37,37 @@ func main() {
 		streamPg   = postgres.NewStream()
 		videoPg    = postgres.NewVideo()
 		playlistPg = postgres.NewPlaylist()
+		playPg     = postgres.NewPlay()
 	)
 
 	var (
 		playlistLogic = logic.NewPlaylist(playlistPg, videoPg, streamPg, tg)
 		videoLogic    = logic.NewVideo(videoPg, youtube, ytdlp, sponsorBlock)
 		streamLogic   = logic.NewStream(streamPg, videoPg, playlistPg, youtube)
+		playLogic     = logic.NewPlay(playPg, streamPg, videoPg, playlistPg, tg)
 	)
 
-	manager := streamer.NewManager(playlistLogic, videoLogic, streamLogic, ytdlp)
+	var (
+		manager   = streamer.NewManager(playlistLogic, videoLogic, streamLogic, playLogic, ytdlp)
+		tgHandler = telegram.NewHandler(playLogic, tg)
+	)
 
 	manager.Run(ctx)
+	tgHandler.Run(ctx)
 	playlistLogic.Run(ctx)
 	videoLogic.Run(ctx)
 	streamLogic.Run(ctx)
+	playLogic.Run(ctx)
 
 	log.Default().Info("service started")
 	<-stopContext.Done()
 	log.Default().Info("stop signal received")
+
 	manager.Stop()
+	tgHandler.Stop()
 	playlistLogic.Stop()
 	videoLogic.Stop()
 	streamLogic.Stop()
+	playLogic.Stop()
+	log.Default().Info("service stopped")
 }

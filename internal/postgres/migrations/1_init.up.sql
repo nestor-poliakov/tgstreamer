@@ -25,3 +25,13 @@ create table playlist_item (
 create unique index unique_playlist_item_stream_id_current
 on playlist_item (stream_id)
 where is_current = true;
+
+
+create table play (
+    id               bigserial not null primary key,
+    created_at       bigint    not null default extract(epoch from now()),
+    playlist_item_id bigint    not null references playlist_item(id),
+    announce_msg_id  bigint    not null,
+    likes            bigint    not null default 0,
+    skips            bigint    not null default 0
+);

@@ -16,8 +16,9 @@ type Stream struct {
 	videoStorage    postgres.Video
 	playlistStorage postgres.Playlist
 	youtube         *rpc.Youtube
-	wg              *sync.WaitGroup
-	stopFunc        context.CancelFunc
+
+	wg       *sync.WaitGroup
+	stopFunc context.CancelFunc
 }
 
 func NewStream(streamStorage postgres.Stream, videoStorage postgres.Video, playlistStorage postgres.Playlist, youtube *rpc.Youtube) *Stream {

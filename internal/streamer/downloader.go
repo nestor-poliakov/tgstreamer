@@ -19,11 +19,11 @@ type Downloader struct {
 	audioBitrate int
 	downloader   *rpc.YtDlpClient
 	videoLogic   *logic.Video
-	from         <-chan app.Video
-	to           chan<- app.Video
+	from         <-chan video
+	to           chan<- video
 }
 
-func NewDownloader(from <-chan app.Video, to chan<- app.Video, downloader *rpc.YtDlpClient, videoLogic *logic.Video, resolution string, audioBitrate int) *Downloader {
+func NewDownloader(from <-chan video, to chan<- video, downloader *rpc.YtDlpClient, videoLogic *logic.Video, resolution string, audioBitrate int) *Downloader {
 	return &Downloader{
 		from:         from,
 		to:           to,
@@ -51,12 +51,13 @@ func (d *Downloader) downloadingLoop(ctx context.Context, wg *sync.WaitGroup) {
 			if !ok {
 				return
 			}
-			vctx := log.With(ctx, "video", v.Id)
-			v, err := d.download(vctx, v)
+			vctx := log.With(ctx, "video_id", v.video.Id, "playlist_item_id", v.playlistItemId)
+			video, err := d.download(vctx, v.video)
 			if err != nil {
-				log.FromContext(vctx).Error("download video", "error", err)
+				log.FromContext(vctx).With("error", err).Error("failed to download video")
 				continue
 			}
+			v.video = video
 			select {
 			case d.to <- v:
 			case <-ctx.Done():

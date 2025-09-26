@@ -55,9 +55,9 @@ func (c *AdCutter) processingLoop(ctx context.Context, wg *sync.WaitGroup) {
 
 func (c *AdCutter) processPiece(piece piece) piece {
 	return piece
-	if piece.videoId != c.curVideoId {
-		c.segments = c.normalizeSegments(piece.Video.SbInfo.Segments, float64(piece.Video.FileInfo.DurationV))
-		c.curVideoId = piece.videoId
+	if piece.video.Id != c.curVideoId {
+		c.segments = c.normalizeSegments(piece.video.SbInfo.Segments, float64(piece.video.FileInfo.DurationV))
+		c.curVideoId = piece.video.Id
 	}
 	if len(c.segments) == 0 {
 		return piece

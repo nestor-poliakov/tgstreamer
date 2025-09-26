@@ -6,8 +6,14 @@ import (
 	"github.com/nestor-poliakov/joy5/av"
 )
 
+// group of packets started with key frame
 type piece struct {
-	Video   *app.Video
-	videoId int64
-	packets []av.Packet
+	playlistItemId int64
+	packets        []av.Packet
+	video          app.Video
+}
+
+type video struct {
+	playlistItemId int64
+	video          app.Video
 }

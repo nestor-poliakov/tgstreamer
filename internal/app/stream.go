@@ -31,6 +31,9 @@ type Settings struct {
 	//WxH
 	Resolution   string `json:"resolution,omitempty"`
 	AudioBitrate int    `json:"audio_bitrate,omitempty"`
+
+	WithLikeButton bool `json:"with_like_button,omitempty"`
+	WithSkipButton bool `json:"with_skip_button,omitempty"`
 }
 
 func (y *Settings) Scan(v any) error {

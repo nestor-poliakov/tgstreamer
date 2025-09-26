@@ -12,7 +12,6 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"tgstreamer/internal/app"
 	"tgstreamer/lib/log"
 
 	"github.com/nestor-poliakov/joy5/av"
@@ -23,11 +22,11 @@ import (
 )
 
 type Reader struct {
-	videos <-chan app.Video
+	videos <-chan video
 	ch     chan<- piece
 }
 
-func NewReader(videos <-chan app.Video, ch chan<- piece) *Reader {
+func NewReader(videos <-chan video, ch chan<- piece) *Reader {
 	return &Reader{
 		videos: videos,
 		ch:     ch,
@@ -53,30 +52,30 @@ func (r *Reader) readingLoop(ctx context.Context, wg *sync.WaitGroup) {
 			if !ok {
 				return
 			}
-			vctx = log.With(ctx, "video_id", video.Id)
+			vctx = log.With(ctx, "video_id", video.video.Id, "playlist_item_id", video.playlistItemId)
 			err := r.processVideo(vctx, video)
 			if err != nil {
-				log.FromContexts(vctx).With("error", err).Errorf("process video %q", video.FileInfo.Name)
+				log.FromContexts(vctx).With("error", err).Errorf("failed to process video")
 			}
 		}
 	}
 }
 
-func (r *Reader) processVideo(ctx context.Context, video app.Video) (err error) {
-	log.FromContexts(ctx).Infof("start reading new video %q", video.FileInfo.Name)
-	if len(video.FileInfo.Name) == 0 {
+func (r *Reader) processVideo(ctx context.Context, video video) (err error) {
+	log.FromContexts(ctx).Infof("start reading new video %q", video.video.FileInfo.Name)
+	if len(video.video.FileInfo.Name) == 0 {
 		return fmt.Errorf("file name is empty")
 	}
 
-	if path.Ext(video.FileInfo.Name) != ".mp4" {
-		return fmt.Errorf("unknown video format %q", video.FileInfo.Name)
+	if path.Ext(video.video.FileInfo.Name) != ".mp4" {
+		return fmt.Errorf("unknown video format %q", video.video.FileInfo.Name)
 	}
-	reader, m, err := r.getMp4Reader(ctx, video.FileInfo.Name)
+	reader, m, err := r.getMp4Reader(ctx, video.video.FileInfo.Name)
 	if err != nil {
 		return fmt.Errorf("get reader: %w", err)
 	}
 	defer reader.Close()
-	defer log.FromContexts(ctx).Infof("finished reading video %q", video.FileInfo.Name)
+	defer log.FromContexts(ctx).Infof("finished reading video %q", video.video.FileInfo.Name)
 	return r.processReader(ctx, reader, video, m)
 }
 
@@ -140,7 +139,7 @@ func (r *Reader) getFlvReader(fileName string) (io.ReadCloser, error) {
 	return f, nil
 }
 
-func (r *Reader) processReader(ctx context.Context, reader io.Reader, video app.Video, m flvio.AMFMap) error {
+func (r *Reader) processReader(ctx context.Context, reader io.Reader, video video, m flvio.AMFMap) error {
 	demuxer := flv.NewDemuxer(reader)
 
 	err := demuxer.ReadFileHeader()
@@ -155,7 +154,7 @@ func (r *Reader) processReader(ctx context.Context, reader io.Reader, video app.
 			Data: data,
 		},
 	}
-	log.FromContexts(ctx).Infof("start processing file %q", video.FileInfo.Name)
+	log.FromContexts(ctx).Infof("start processing file %q", video.video.FileInfo.Name)
 	for {
 		packets, keyFrame, err := r.readUntilKeyFrame(demuxer, keyFrames)
 		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
@@ -166,9 +165,9 @@ func (r *Reader) processReader(ctx context.Context, reader io.Reader, video app.
 		}
 		select {
 		case r.ch <- piece{
-			Video:   &video,
-			videoId: video.Id,
-			packets: packets,
+			playlistItemId: video.playlistItemId,
+			video:          video.video,
+			packets:        packets,
 		}:
 		case <-ctx.Done():
 			return ctx.Err()

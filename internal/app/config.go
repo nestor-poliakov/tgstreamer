@@ -7,11 +7,11 @@ import (
 )
 
 type Config struct {
-	VideosDir     string    `yaml:"videos_dir"`
-	CookiesFile   string    `yaml:"cookies_file"`
-	YoutubeApiKey string    `yaml:"youtube_api_key"`
-	Pg            pg.Config `yaml:"pg"`
-	TgBotToken    string    `yaml:"tg_bot_token"`
+	VideosDir     string
+	CookiesFile   string
+	YoutubeApiKey string
+	Pg            pg.Config
+	TgBotToken    string
 }
 
 func ReadConfig() (conf Config) {

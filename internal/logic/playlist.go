@@ -17,9 +17,10 @@ type Playlist struct {
 	videoStorage    postgres.Video
 	streamStorage   postgres.Stream
 	tg              *rpc.Telegram
-	toSetCurrent    chan int64
-	wg              *sync.WaitGroup
-	stopFunc        func()
+
+	toSetCurrent chan int64
+	wg           *sync.WaitGroup
+	stopFunc     func()
 }
 
 func NewPlaylist(playlist postgres.Playlist, video postgres.Video, stream postgres.Stream, tg *rpc.Telegram) *Playlist {
@@ -62,32 +63,16 @@ func (p *Playlist) processingLoop(ctx context.Context) {
 	}
 }
 
-func (p *Playlist) setCurrent(ctx context.Context, id int64) error {
-	err := p.playlistStorage.SetCurrent(ctx, id)
+func (p *Playlist) setCurrent(ctx context.Context, playlistItemId int64) error {
+	err := p.playlistStorage.SetCurrent(ctx, playlistItemId)
 	if err != nil {
-		log.FromContext(ctx).Error("set current playlist item in storage", "error", err)
-	}
-	plitem, err := p.playlistStorage.Get(ctx, id)
-	if err != nil {
-		return fmt.Errorf("get playlist item: %w", err)
-	}
-	stream, err := p.streamStorage.Get(ctx, plitem.StreamId)
-	if err != nil {
-		return fmt.Errorf("get stream: %w", err)
-	}
-	if stream.Settings.TgChannelId == 0 {
-		return nil
-	}
-	video, err := p.videoStorage.Get(ctx, plitem.VideoId)
-	if err != nil {
-		return fmt.Errorf("get video: %w", err)
-	}
-
-	err = p.tg.Announce(ctx, stream.Settings.TgChannelId, video)
-	if err != nil {
-		return fmt.Errorf("announce new video %d to tg channel %d: %w", video.Id, stream.Settings.TgChannelId, err)
+		return fmt.Errorf("set current playlist item: %w", err)
 	}
 	return nil
+}
+
+func (p *Playlist) Get(ctx context.Context, id int64) (app.PlaylistItem, error) {
+	return p.playlistStorage.Get(ctx, id)
 }
 
 func (p *Playlist) GetCurrent(ctx context.Context, streamId int64) (int64, app.Video, error) {
@@ -137,9 +122,9 @@ func (p *Playlist) getFirst(ctx context.Context, streamId int64) (int64, app.Vid
 	return plitem.Id, video, nil
 }
 
-func (p *Playlist) SetCurrent(id int64) {
+func (p *Playlist) SetCurrent(playlistItemId int64) {
 	select {
-	case p.toSetCurrent <- id:
+	case p.toSetCurrent <- playlistItemId:
 	default:
 	}
 }
