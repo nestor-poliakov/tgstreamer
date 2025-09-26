@@ -15,7 +15,7 @@ Key features:
 **Live Example**: [@anime_openings_stream](https://t.me/anime_openings_stream)
 
 ## Known Problems
-- When no one watching stream for some time, telegram shut down processing, but still reads packets from connection. When someone joins the steam, it is not starting processing, so there is no stream on client side.
+- When no one watching stream for some time, telegram shut down processing, but still reads packets from connection. When someone joins the steam, it is not starting processing, so there is no stream on client side. Somtimes waiting for new video or rejoining to stream helps.
 - Change in video resolution, number of audio channels or audio bitrate breaks the stream. Current solution: filter videos by resolution, number of channels and audio bitrate.
 
 
