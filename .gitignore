@@ -2,4 +2,3 @@ local
 .DS_Store
 .env
 internal/postgres/migrations/2_data.up.sql
-vendor
