@@ -14,15 +14,9 @@ github.com/go-logr/logr/funcr
 # github.com/go-logr/stdr v1.2.2
 ## explicit; go 1.16
 github.com/go-logr/stdr
-# github.com/go-sql-driver/mysql v1.8.1
-## explicit; go 1.18
 # github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 ## explicit; go 1.16
 github.com/go-telegram-bot-api/telegram-bot-api/v5
-# github.com/gocraft/dbr/v2 v2.7.7
-## explicit; go 1.21
-github.com/gocraft/dbr/v2
-github.com/gocraft/dbr/v2/dialect
 # github.com/golang-migrate/migrate/v4 v4.18.2
 ## explicit; go 1.22.0
 github.com/golang-migrate/migrate/v4
@@ -83,6 +77,8 @@ github.com/hashicorp/errwrap
 github.com/hashicorp/go-multierror
 # github.com/jmoiron/sqlx v1.4.0
 ## explicit; go 1.10
+github.com/jmoiron/sqlx
+github.com/jmoiron/sqlx/reflectx
 # github.com/lib/pq v1.10.9
 ## explicit; go 1.13
 github.com/lib/pq

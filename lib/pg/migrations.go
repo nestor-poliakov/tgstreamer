@@ -24,15 +24,11 @@ func Migrate(fs fs.FS, conf Config) {
 		defer conn.Close()
 		var dropSql []string
 		var dropTypes []string
-		_, err := conn.NewSession(nil).
-			SelectBySql(`select 'drop table if exists "' || schemaname || '"."' || tablename || '" cascade;' as string from pg_tables where not schemaname in ('pg_catalog','information_schema');`).
-			LoadContext(ctx, &dropSql)
+		err := conn.SelectContext(ctx, &dropSql, `select 'drop table if exists "' || schemaname || '"."' || tablename || '" cascade;' as string from pg_tables where not schemaname in ('pg_catalog','information_schema');`)
 		if err != nil {
 			panic(fmt.Errorf("get drop tables query: %w", err))
 		}
-		_, err = conn.NewSession(nil).
-			SelectBySql(`select 'drop type if exists "' || typname || '";' as str from pg_catalog.pg_type where typowner in (select oid from pg_catalog.pg_authid where rolname = current_role);`).
-			LoadContext(ctx, &dropTypes)
+		err = conn.SelectContext(ctx, &dropTypes, `select 'drop type if exists "' || typname || '";' as str from pg_catalog.pg_type where typowner in (select oid from pg_catalog.pg_authid where rolname = current_role);`)
 		if err != nil {
 			panic(fmt.Errorf("get drop types query: %w", err))
 		}

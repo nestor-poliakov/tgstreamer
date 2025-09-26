@@ -14,11 +14,11 @@ var (
 )
 
 type Stream struct {
-	Id       int64
-	Name     string
-	IsActive bool
-	Type     StreamType
-	Settings Settings
+	Id       int64      `db:"id"`
+	Name     string     `db:"name"`
+	IsActive bool       `db:"is_active"`
+	Type     StreamType `db:"type"`
+	Settings Settings   `db:"settings"`
 }
 
 type Settings struct {

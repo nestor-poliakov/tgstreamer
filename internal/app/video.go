@@ -7,13 +7,13 @@ import (
 )
 
 type Video struct {
-	Id int64
+	Id int64 `db:"id"`
 	// youtube video id
-	Code      string
-	CreatedAt int64
-	FileInfo  FileInfo
-	YtInfo    YoutubeInfo
-	SbInfo    SponsorBlockInfo
+	Code      string           `db:"code"`
+	CreatedAt int64            `db:"created_at"`
+	FileInfo  FileInfo         `db:"file_info"`
+	YtInfo    YoutubeInfo      `db:"yt_info"`
+	SbInfo    SponsorBlockInfo `db:"sb_info"`
 }
 
 type FileInfo struct {
@@ -58,9 +58,9 @@ type Segment struct {
 }
 
 type PlaylistItem struct {
-	Id       int64
-	VideoId  int64
-	StreamId int64
+	Id       int64 `db:"id"`
+	VideoId  int64 `db:"video_id"`
+	StreamId int64 `db:"stream_id"`
 }
 
 func (y *YoutubeInfo) Scan(v any) error {

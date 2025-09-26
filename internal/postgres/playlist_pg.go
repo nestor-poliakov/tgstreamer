@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"tgstreamer/internal/app"
@@ -15,7 +16,7 @@ func NewPlaylist() Playlist {
 }
 
 func (Playlist) Create(ctx context.Context, videoId int64, streamId int64) error {
-	sql := `insert into playlist_item (video_id, stream_id) values (?, ?)`
+	sql := `insert into playlist_item (video_id, stream_id) values ($1, $2)`
 	return pg.FromContext(ctx).Query(sql, videoId, streamId).ExecContext(ctx)
 }
 
@@ -35,48 +36,63 @@ func (Playlist) CreateList(ctx context.Context, videoIds []int64, streamId int64
 }
 
 func (Playlist) GetForStream(ctx context.Context, streamId int64) (res []app.PlaylistItem, err error) {
-	sql := `select id, video_id, stream_id from playlist_item where stream_id = ?`
+	sql := `select id, video_id, stream_id from playlist_item where stream_id = $1`
 	return res, pg.FromContext(ctx).Query(sql, streamId).LoadContext(ctx, &res)
 }
 
 func (Playlist) SetCurrent(ctx context.Context, id int64) error {
-	sql := `begin;
-
-			update playlist_item
+	ctx, tx, err := pg.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.RollbackUnlessCommitted()
+	sql := `update playlist_item
 			set is_current = false
-			where stream_id = (select stream_id from playlist_item where id = ?)
-			and is_current;
+			where stream_id = (select stream_id from playlist_item where id = $1)
+			and is_current;`
 
-			update playlist_item
+	err = pg.FromContext(ctx).Query(sql, id).ExecContext(ctx)
+	if err != nil {
+		return fmt.Errorf("clear current: %w", err)
+	}
+
+	sql = `update playlist_item
 			set is_current = true
-			where stream_id = (select stream_id from playlist_item where id = ?)
-			and id = ?;
+			where stream_id = (select stream_id from playlist_item where id = $1)
+			and id = $1;`
+	err = pg.FromContext(ctx).Query(sql, id).ExecContext(ctx)
+	if err != nil {
+		return fmt.Errorf("set current: %w", err)
+	}
 
-			commit;`
-	return pg.FromContext(ctx).Query(sql, id, id, id).ExecContext(ctx)
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("commit tx: %w", err)
+	}
+	return nil
 }
 
 func (Playlist) Get(ctx context.Context, id int64) (res app.PlaylistItem, err error) {
-	sql := `select id, video_id, stream_id from playlist_item where id = ?`
+	sql := `select id, video_id, stream_id from playlist_item where id = $1`
 	return res, pg.FromContext(ctx).Query(sql, id).LoadOneContext(ctx, &res)
 }
 
 func (Playlist) GetCurrent(ctx context.Context, streamId int64) (res app.PlaylistItem, err error) {
-	sql := `select id, video_id, stream_id from playlist_item where stream_id = ? and is_current = true`
+	sql := `select id, video_id, stream_id from playlist_item where stream_id = $1 and is_current = true`
 	return res, pg.FromContext(ctx).Query(sql, streamId).LoadOneContext(ctx, &res)
 }
 
 func (Playlist) GetNext(ctx context.Context, playlistItemId int64) (res app.PlaylistItem, err error) {
 	sql := `select id, video_id, stream_id
 			from playlist_item
-			where stream_id = (select stream_id FROM playlist_item where id = ?)
-			and id > ?
+			where stream_id = (select stream_id FROM playlist_item where id = $1)
+			and id > $2
 			order by id asc
 			limit 1;`
 	return res, pg.FromContext(ctx).Query(sql, playlistItemId, playlistItemId).LoadOneContext(ctx, &res)
 }
 
 func (Playlist) GetFirst(ctx context.Context, streamId int64) (res app.PlaylistItem, err error) {
-	sql := `select id, video_id, stream_id from playlist_item where stream_id = ? order by id asc limit 1`
+	sql := `select id, video_id, stream_id from playlist_item where stream_id = $1 order by id asc limit 1`
 	return res, pg.FromContext(ctx).Query(sql, streamId).LoadOneContext(ctx, &res)
 }

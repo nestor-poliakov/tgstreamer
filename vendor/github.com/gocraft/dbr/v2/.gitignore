@@ -1,9 +1,0 @@
-# Mac Things
-.DS_Store
-# Goland things
-.idea/
-.vscode/
-# Emacs
-*~
-# Local development directories
-tmp/

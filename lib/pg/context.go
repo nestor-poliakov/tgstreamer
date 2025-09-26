@@ -8,7 +8,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gocraft/dbr/v2"
+	"github.com/jmoiron/sqlx"
+
 	_ "github.com/lib/pq"
 )
 
@@ -17,80 +18,32 @@ var (
 	ErrNoPgConnInContext = errors.New("no pg connection in context")
 )
 
-type pgSessionCtx struct{}
-
-type Scanner interface {
-	Scan(dest ...any) error
-}
+type pgConnCtx struct{}
 
 type Loader interface {
-	// placeholder: ?
 	LoadContext(ctx context.Context, val any) error
 	LoadOneContext(ctx context.Context, val any) error
 	ExecContext(ctx context.Context) error
-	// placeholder: $num
-	QueryRowContext(ctx context.Context) Scanner
-	QueryContext(ctx context.Context) (*sql.Rows, error)
-}
-
-type loader struct {
-	sess  *dbr.Session
-	query string
-	args  []any
-}
-
-func (l *loader) LoadContext(ctx context.Context, val any) error {
-	return l.sess.InsertBySql(l.query, l.args...).LoadContext(ctx, val)
-}
-
-func (l *loader) LoadOneContext(ctx context.Context, val any) error {
-	return l.sess.SelectBySql(l.query, l.args...).LoadOneContext(ctx, val)
-}
-
-func (l *loader) ExecContext(ctx context.Context) error {
-	_, err := l.sess.UpdateBySql(l.query, l.args...).ExecContext(ctx)
-	return err
-}
-
-func (l *loader) QueryContext(ctx context.Context) (*sql.Rows, error) {
-	return l.sess.DB.QueryContext(ctx, l.query, l.args...)
-}
-
-func (l *loader) QueryRowContext(ctx context.Context) Scanner {
-	return l.sess.DB.QueryRowContext(ctx, l.query, l.args...)
 }
 
 type Queryer interface {
 	Query(query string, vals ...any) Loader
 }
 
-type queryer struct {
-	sess *dbr.Session
+type Tx interface {
+	Commit() error
+	RollbackUnlessCommitted()
+	Rollback() error
 }
 
-func (s *queryer) Query(query string, vals ...any) Loader {
-	s.sess.EventKv("query pg", map[string]string{"sql": query})
-	return &loader{
-		sess:  s.sess,
-		query: query,
-		args:  vals,
-	}
-}
-
-type nullQueryer struct{}
-
-func (nullQueryer) Query(query string, vals ...any) Loader {
-	return nullLoader{}
-}
-
-func NewContext(parent context.Context, conn *dbr.Connection) context.Context {
-	return context.WithValue(parent, pgSessionCtx{}, conn)
+func NewContext(parent context.Context, conn *sqlx.DB) context.Context {
+	return context.WithValue(parent, pgConnCtx{}, conn)
 }
 
 func FromContext(ctx context.Context) Queryer {
-	switch val := ctx.Value(pgSessionCtx{}).(type) {
-	case *dbr.Connection:
-		return &queryer{sess: val.NewSession(nil)}
+	switch val := ctx.Value(pgConnCtx{}).(type) {
+	case *sqlx.DB:
+		return &queryer{db: val}
 	case *tx:
 		return &txQueryer{tx: val.tx}
 	default:
@@ -98,45 +51,74 @@ func FromContext(ctx context.Context) Queryer {
 	}
 }
 
-func NewConn(ctx context.Context, pg string) *dbr.Connection {
-	dbr.ErrNotFound = ErrNoRows
+func NewConn(ctx context.Context, pg string) *sqlx.DB {
+	sql.ErrNoRows = ErrNoRows
 	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
-	conn, err := dbr.Open("postgres", pg, nil)
+	conn, err := sqlx.Connect("postgres", pg)
 	if err != nil {
 		panic(fmt.Errorf("open postgres conn: %w", err))
-	}
-	err = conn.PingContext(ctx)
-	if err != nil {
-		panic(fmt.Errorf("ping pg connection: %w", err))
 	}
 	return conn
 }
 
 func Begin(ctx context.Context) (context.Context, Tx, error) {
-	switch val := ctx.Value(pgSessionCtx{}).(type) {
-	case *dbr.Connection:
-		dbrTx, err := val.NewSession(nil).Begin()
+	switch val := ctx.Value(pgConnCtx{}).(type) {
+	case *sqlx.DB:
+		sqlxTx, err := val.BeginTxx(ctx, &sql.TxOptions{})
 		if err != nil {
 			return ctx, nil, fmt.Errorf("begin tx: %w", err)
 		}
 		t := &tx{
-			tx: dbrTx,
+			tx: sqlxTx,
 		}
-		return context.WithValue(ctx, pgSessionCtx{}, t), t, nil
+		return context.WithValue(ctx, pgConnCtx{}, t), t, nil
 	case *tx:
 		t, err := val.Begin()
 		if err != nil {
 			return ctx, nil, fmt.Errorf("begin nested tx: %w", err)
 		}
-		return context.WithValue(ctx, pgSessionCtx{}, t), t, nil
+		return context.WithValue(ctx, pgConnCtx{}, t), t, nil
+	case nil:
+		return nil, nil, ErrNoPgConnInContext
 	default:
 		return nil, nil, fmt.Errorf("unknown value in context: %T", val)
 	}
 }
 
+type loader struct {
+	db    *sqlx.DB
+	query string
+	args  []any
+}
+
+func (l *loader) LoadContext(ctx context.Context, val any) error {
+	return l.db.SelectContext(ctx, val, l.query, l.args...)
+}
+
+func (l *loader) LoadOneContext(ctx context.Context, val any) error {
+	return l.db.GetContext(ctx, val, l.query, l.args...)
+}
+
+func (l *loader) ExecContext(ctx context.Context) error {
+	_, err := l.db.ExecContext(ctx, l.query, l.args...)
+	return err
+}
+
+type queryer struct {
+	db *sqlx.DB
+}
+
+func (s *queryer) Query(query string, vals ...any) Loader {
+	return &loader{
+		db:    s.db,
+		query: query,
+		args:  vals,
+	}
+}
+
 type txQueryer struct {
-	tx *dbr.Tx
+	tx *sqlx.Tx
 }
 
 func (t *txQueryer) Query(query string, vals ...any) Loader {
@@ -148,40 +130,26 @@ func (t *txQueryer) Query(query string, vals ...any) Loader {
 }
 
 type txLoader struct {
-	tx    *dbr.Tx
+	tx    *sqlx.Tx
 	query string
 	args  []any
 }
 
 func (t *txLoader) LoadContext(ctx context.Context, val any) error {
-	return t.tx.UpdateBySql(t.query, t.args...).LoadContext(ctx, val)
+	return t.tx.SelectContext(ctx, val, t.query, t.args...)
 }
 
 func (t *txLoader) LoadOneContext(ctx context.Context, val any) error {
-	return t.tx.SelectBySql(t.query, t.args...).LoadOneContext(ctx, val)
+	return t.tx.GetContext(ctx, val, t.query, t.args...)
 }
 
 func (t *txLoader) ExecContext(ctx context.Context) error {
-	_, err := t.tx.UpdateBySql(t.query, t.args...).ExecContext(ctx)
+	_, err := t.tx.ExecContext(ctx, t.query, t.args...)
 	return err
 }
 
-func (t *txLoader) QueryRowContext(ctx context.Context) Scanner {
-	return t.tx.QueryRowContext(ctx, t.query, t.args...)
-}
-
-func (t *txLoader) QueryContext(ctx context.Context) (*sql.Rows, error) {
-	return t.tx.QueryContext(ctx, t.query, t.args)
-}
-
-type Tx interface {
-	Commit() error
-	RollbackUnlessCommitted()
-	Rollback() error
-}
-
 type tx struct {
-	tx       *dbr.Tx
+	tx       *sqlx.Tx
 	prev     *tx
 	num      int
 	commited bool
@@ -224,29 +192,13 @@ func (t *tx) Begin() (*tx, error) {
 	}, nil
 }
 
-type beginner interface {
-	Begin() (*dbr.Tx, error)
-}
+type nullQueryer struct{}
 
-type nullScanner struct{}
-
-func (nullScanner) Scan(dest ...any) error {
-	return ErrNoPgConnInContext
+func (nullQueryer) Query(query string, vals ...any) Loader {
+	return nullLoader{}
 }
 
 type nullLoader struct{}
-
-func (l nullLoader) Begin() (*dbr.Tx, error) {
-	return nil, ErrNoPgConnInContext
-}
-
-func (nullLoader) QueryRowContext(ctx context.Context) Scanner {
-	return nullScanner{}
-}
-
-func (nullLoader) QueryContext(ctx context.Context) (*sql.Rows, error) {
-	return nil, ErrNoPgConnInContext
-}
 
 func (nullLoader) LoadContext(ctx context.Context, val any) error {
 	return ErrNoPgConnInContext
