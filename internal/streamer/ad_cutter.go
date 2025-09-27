@@ -54,7 +54,6 @@ func (c *AdCutter) processingLoop(ctx context.Context, wg *sync.WaitGroup) {
 }
 
 func (c *AdCutter) processPiece(piece piece) piece {
-	return piece
 	if piece.video.Id != c.curVideoId {
 		c.segments = c.normalizeSegments(piece.video.SbInfo.Segments, float64(piece.video.FileInfo.DurationV))
 		c.curVideoId = piece.video.Id
@@ -63,7 +62,7 @@ func (c *AdCutter) processPiece(piece piece) piece {
 		return piece
 	}
 	if c.skipPackets(piece.packets) {
-		configPackets := make([]av.Packet, 0, 3)
+		configPackets := make([]av.Packet, 0)
 		for _, packet := range piece.packets {
 			if packet.Type > 2 {
 				configPackets = append(configPackets, packet)
@@ -85,6 +84,9 @@ func (c *AdCutter) skipPackets(packets []av.Packet) bool {
 			break
 		}
 	}
+	if firstNotConfig.Type == 0 {
+		return false
+	}
 	lastNotConfig := av.Packet{}
 	for i := len(packets) - 1; i >= 0; i-- {
 		if packets[i].Type <= 2 {
@@ -95,16 +97,16 @@ func (c *AdCutter) skipPackets(packets []av.Packet) bool {
 
 	start := firstNotConfig.Time.Seconds()
 	end := lastNotConfig.Time.Seconds()
-	if start >= c.segments[0][1] {
+	for start >= c.segments[0][1] {
 		c.segments = c.segments[1:]
+		if len(c.segments) == 0 {
+			return false
+		}
 	}
-	if len(c.segments) == 0 {
+	if end <= c.segments[0][0] {
 		return false
 	}
-	if start <= c.segments[0][1] || end >= c.segments[0][0] {
-		return true
-	}
-	return false
+	return true
 }
 
 func (c *AdCutter) normalizeSegments(segments []app.Segment, duration float64) [][2]float64 {

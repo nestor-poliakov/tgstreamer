@@ -17,6 +17,7 @@ Key features:
 ## Known Problems
 - When no one watching stream for some time, telegram shut down processing, but still reads packets from connection. When someone joins the steam, it is not starting processing, so there is no stream on client side. Somtimes waiting for new video or rejoining to stream helps.
 - Change in video resolution, number of audio channels or audio bitrate breaks the stream. Current solution: filter videos by resolution, number of channels and audio bitrate.
+- The original joy5 library didn’t work with Telegram, so I had to fork it and apply some fixes.
 
 
 ## Configuration
@@ -51,7 +52,7 @@ Key features:
 - [x] cut ad using data from SponsorBlock
 - [x] ~~predownloading videos before streaming pipeline~~
 - [x] vote for skipping video
-- [ ] BUG ad cutter not working
+- [x] BUG ad cutter not working
 - [ ] better video quality
 - [ ] make video playlist automatically with new videos by list of youtube channels
 - [ ] receive suggestions about new videos
