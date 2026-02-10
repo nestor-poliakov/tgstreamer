@@ -55,8 +55,8 @@ func (y *YtDlpClient) download(ctx context.Context, videoUrl string, fileName st
 	y.rateLimit(ctx)
 	log.FromContexts(ctx).Info("start downloading video " + videoUrl)
 	t := time.Now()
-	args := []string{"-f", "mp4",
-		"--user-agent", `"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"`,
+	args := []string{"-t", "mp4",
+		"--user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36",
 		"--geo-bypass",
 		"--limit-rate", "1M",
 		"--sleep-interval", "10",
@@ -72,8 +72,8 @@ func (y *YtDlpClient) download(ctx context.Context, videoUrl string, fileName st
 	cmd.Stderr = io.MultiWriter(os.Stdout, stdErr)
 	err = cmd.Run()
 	if err != nil {
-		log.FromContexts(ctx).With("cmd", cmd.String(), "error", stdErr.String()).Error("exec command")
-		return "", fmt.Errorf("stdout: %s", stdErr.String())
+		log.FromContexts(ctx).With("cmd", cmd.String(), "error", err, "stderr", stdErr.String()).Error("exec command")
+		return "", fmt.Errorf("stdout: %s: %w", stdErr.String(), err)
 	}
 	info, err := os.Stat(fileName)
 	if err != nil {

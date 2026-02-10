@@ -54,13 +54,18 @@ func (c *Telegram) Announce(ctx context.Context, settings app.Settings, video ap
 		}
 	}
 
+	thumbnail := video.YtInfo.Thumbnail
+	if thumbnail == "" {
+		thumbnail = fmt.Sprintf("https://img.youtube.com/vi/%s/hqdefault.jpg", video.Code)
+	}
+
 	msg, err := c.client.Send(tgbotapi.PhotoConfig{
 		BaseFile: tgbotapi.BaseFile{
 			BaseChat: tgbotapi.BaseChat{
 				ChatID:      settings.TgChannelId,
 				ReplyMarkup: markup,
 			},
-			File: tgbotapi.FileURL(video.YtInfo.Thumbnail),
+			File: tgbotapi.FileURL(thumbnail),
 		},
 		Thumb:           nil,
 		Caption:         fmt.Sprintf(`<a href="https://youtube.com/watch?v=%s">%s</a>`, video.Code, video.YtInfo.Title),

@@ -185,7 +185,7 @@ func (v *Video) deletingLoop(ctx context.Context) {
 		case <-ticker.C:
 			err := v.deleteFiles(ctx)
 			if err != nil {
-				log.FromContext(ctx).Error("delete files", "error", err)
+				log.FromContext(ctx).Error("failed to delete files", "error", err)
 			}
 		case <-ctx.Done():
 			return

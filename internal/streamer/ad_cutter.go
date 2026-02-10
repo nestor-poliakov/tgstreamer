@@ -7,6 +7,7 @@ import (
 	"tgstreamer/internal/app"
 	"tgstreamer/internal/rpc"
 	"tgstreamer/lib/log"
+	"time"
 
 	"github.com/nestor-poliakov/joy5/av"
 )
@@ -16,6 +17,7 @@ type AdCutter struct {
 	in         chan piece
 	out        chan piece
 	curVideoId int64
+	timeOffset time.Duration
 	segments   [][2]float64
 }
 
@@ -57,11 +59,15 @@ func (c *AdCutter) processPiece(piece piece) piece {
 	if piece.video.Id != c.curVideoId {
 		c.segments = c.normalizeSegments(piece.video.SbInfo.Segments, float64(piece.video.FileInfo.DurationV))
 		c.curVideoId = piece.video.Id
+		c.timeOffset = 0
 	}
+
 	if len(c.segments) == 0 {
+		c.rewritePacketsTime(piece.packets)
 		return piece
 	}
 	if c.skipPackets(piece.packets) {
+		c.timeOffset += c.calcDuration(piece.packets)
 		configPackets := make([]av.Packet, 0)
 		for _, packet := range piece.packets {
 			if packet.Type > 2 {
@@ -69,8 +75,28 @@ func (c *AdCutter) processPiece(piece piece) piece {
 			}
 		}
 		piece.packets = configPackets
+	} else {
+		c.rewritePacketsTime(piece.packets)
 	}
 	return piece
+}
+
+func (c *AdCutter) rewritePacketsTime(packets []av.Packet) {
+	for i := range packets {
+		if packets[i].Type == av.H264 || packets[i].Type == av.AAC {
+			packets[i].CTime -= c.timeOffset
+		}
+	}
+}
+
+func (c *AdCutter) calcDuration(packets []av.Packet) time.Duration {
+	t := time.Duration(0)
+	for i := range packets {
+		if packets[i].Type == av.H264 {
+			t += packets[i].CTime
+		}
+	}
+	return t
 }
 
 func (c *AdCutter) skipPackets(packets []av.Packet) bool {

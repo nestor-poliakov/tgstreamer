@@ -20,12 +20,12 @@ tasks:
   build:
     desc: Build docker image
     cmds:
-      - docker buildx build --platform linux/amd64 -t $IMAGE:$TAG -t $IMAGE:latest .
+      - podman build --platform linux/amd64 -t $IMAGE:$TAG -t $IMAGE:latest .
   push:
     desc: Push docker image to registry
     cmds:
-      - docker push $IMAGE:$TAG
-      - docker push $IMAGE:latest
+      - podman push $IMAGE:$TAG
+      - podman push $IMAGE:latest
 
   download:
     desc: Download video

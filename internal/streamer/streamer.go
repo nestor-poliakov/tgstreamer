@@ -103,7 +103,6 @@ func (s *Streamer) processPackets(ctx context.Context, piece piece) error {
 	if isNewVideoInstance {
 		s.playlistLogic.SetCurrent(piece.playlistItemId)
 		s.play.Announce(piece.playlistItemId)
-
 		s.rl = newRateLimiter()
 		s.configs = s.configs[:0]
 		s.curVideoId = piece.video.Id
