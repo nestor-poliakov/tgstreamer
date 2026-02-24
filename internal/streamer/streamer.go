@@ -159,12 +159,17 @@ func (s *Streamer) reconnect(ctx context.Context) {
 }
 
 func (s *Streamer) processPacket(packet av.Packet) error {
-	if packet.Type <= 2 {
+	isMedia := packet.Type <= 2
+	if isMedia {
 		s.rl.Limit(packet)
 	} else {
 		s.configs = append(s.configs, packet)
 	}
-	return s.conn.WritePacket(packet)
+	err := s.conn.WritePacket(packet)
+	if isMedia {
+		s.rl.Mark()
+	}
+	return err
 }
 
 func calcPackets(packets []av.Packet) (configs int, video int, audio int) {

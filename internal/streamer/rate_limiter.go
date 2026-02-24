@@ -26,6 +26,12 @@ func (l *rateLimiter) Limit(p av.Packet) {
 			time.Sleep(pktTimeDiff - wallTimeDiff)
 		}
 		l.pktTimeStart = p.Time
-		l.wallTimeStart = time.Now()
 	}
+}
+
+// Mark resets the wall-clock reference to now. Call it immediately after the
+// packet has been written so that write latency is included in the timing
+// budget of the next packet, preventing drift.
+func (l *rateLimiter) Mark() {
+	l.wallTimeStart = time.Now()
 }
