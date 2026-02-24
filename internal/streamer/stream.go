@@ -23,8 +23,8 @@ type stream struct {
 func newStream(strm app.Stream, playlist *logic.Playlist, videol *logic.Video, play *logic.Play, downloader *rpc.YtDlpClient) *stream {
 	toDownloader := make(chan video, 0)
 	toReader := make(chan video, 0)
-	toAdCutter := make(chan piece, 0)
-	toStreamer := make(chan piece, 20)
+	toAdCutter := make(chan gop, 0)
+	toStreamer := make(chan gop, 20)
 	s := &stream{
 		stream:   strm,
 		playlist: NewPlaylist(toDownloader, strm, playlist),

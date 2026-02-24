@@ -7,7 +7,7 @@ import (
 )
 
 // group of packets started with key frame
-type piece struct {
+type gop struct {
 	playlistItemId int64
 	packets        []av.Packet
 	video          app.Video

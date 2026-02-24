@@ -23,10 +23,10 @@ import (
 
 type Reader struct {
 	videos <-chan video
-	ch     chan<- piece
+	ch     chan<- gop
 }
 
-func NewReader(videos <-chan video, ch chan<- piece) *Reader {
+func NewReader(videos <-chan video, ch chan<- gop) *Reader {
 	return &Reader{
 		videos: videos,
 		ch:     ch,
@@ -164,7 +164,7 @@ func (r *Reader) processReader(ctx context.Context, reader io.Reader, video vide
 			return fmt.Errorf("read until key frame: %w", err)
 		}
 		select {
-		case r.ch <- piece{
+		case r.ch <- gop{
 			playlistItemId: video.playlistItemId,
 			video:          video.video,
 			packets:        packets,

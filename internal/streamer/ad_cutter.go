@@ -5,7 +5,6 @@ import (
 	"sort"
 	"sync"
 	"tgstreamer/internal/app"
-	"tgstreamer/internal/rpc"
 	"tgstreamer/lib/log"
 	"time"
 
@@ -13,15 +12,15 @@ import (
 )
 
 type AdCutter struct {
-	sb         *rpc.SponsorBlockClient
-	in         chan piece
-	out        chan piece
-	curVideoId int64
-	timeOffset time.Duration
-	segments   [][2]float64
+	in          chan gop
+	out         chan gop
+	curVideoId  int64
+	timeOffset  time.Duration
+	segments    [][2]float64
+	segmentIdx  int
 }
 
-func NewAdCutter(in chan piece, out chan piece) *AdCutter {
+func NewAdCutter(in chan gop, out chan gop) *AdCutter {
 	return &AdCutter{
 		in:  in,
 		out: out,
@@ -39,11 +38,11 @@ func (c *AdCutter) processingLoop(ctx context.Context, wg *sync.WaitGroup) {
 	defer close(c.out)
 	for {
 		select {
-		case piece, ok := <-c.in:
+		case g, ok := <-c.in:
 			if !ok {
 				return
 			}
-			p := c.processPiece(piece)
+			p := c.processGop(g)
 			select {
 			case <-ctx.Done():
 				return
@@ -55,52 +54,64 @@ func (c *AdCutter) processingLoop(ctx context.Context, wg *sync.WaitGroup) {
 	}
 }
 
-func (c *AdCutter) processPiece(piece piece) piece {
-	if piece.video.Id != c.curVideoId {
-		c.segments = c.normalizeSegments(piece.video.SbInfo.Segments, float64(piece.video.FileInfo.DurationV))
-		c.curVideoId = piece.video.Id
+func (c *AdCutter) processGop(g gop) gop {
+	if g.video.Id != c.curVideoId {
+		c.segments = c.normalizeSegments(g.video.SbInfo.Segments, float64(g.video.FileInfo.DurationV))
+		c.curVideoId = g.video.Id
 		c.timeOffset = 0
+		c.segmentIdx = 0
 	}
 
 	if len(c.segments) == 0 {
-		c.rewritePacketsTime(piece.packets)
-		return piece
+		c.rewritePacketsTime(g.packets)
+		return g
 	}
-	if c.skipPackets(piece.packets) {
-		c.timeOffset += c.calcDuration(piece.packets)
+	if c.skipPackets(g.packets) {
+		c.timeOffset += c.calcDuration(g.packets)
 		configPackets := make([]av.Packet, 0)
-		for _, packet := range piece.packets {
+		for _, packet := range g.packets {
 			if packet.Type > 2 {
 				configPackets = append(configPackets, packet)
 			}
 		}
-		piece.packets = configPackets
+		g.packets = configPackets
 	} else {
-		c.rewritePacketsTime(piece.packets)
+		c.rewritePacketsTime(g.packets)
 	}
-	return piece
+	return g
 }
 
 func (c *AdCutter) rewritePacketsTime(packets []av.Packet) {
+	if c.timeOffset == 0 {
+		return
+	}
 	for i := range packets {
 		if packets[i].Type == av.H264 || packets[i].Type == av.AAC {
-			packets[i].CTime -= c.timeOffset
+			packets[i].Time -= c.timeOffset
 		}
 	}
 }
 
 func (c *AdCutter) calcDuration(packets []av.Packet) time.Duration {
-	t := time.Duration(0)
-	for i := range packets {
-		if packets[i].Type == av.H264 {
-			t += packets[i].CTime
+	var first, last time.Duration
+	found := false
+	for _, p := range packets {
+		if p.Type == av.H264 || p.Type == av.AAC {
+			if !found {
+				first = p.Time
+				found = true
+			}
+			last = p.Time
 		}
 	}
-	return t
+	if !found {
+		return 0
+	}
+	return last - first
 }
 
 func (c *AdCutter) skipPackets(packets []av.Packet) bool {
-	if len(c.segments) == 0 {
+	if c.segmentIdx >= len(c.segments) {
 		return false
 	}
 	firstNotConfig := av.Packet{}
@@ -123,16 +134,33 @@ func (c *AdCutter) skipPackets(packets []av.Packet) bool {
 
 	start := firstNotConfig.Time.Seconds()
 	end := lastNotConfig.Time.Seconds()
-	for start >= c.segments[0][1] {
-		c.segments = c.segments[1:]
-		if len(c.segments) == 0 {
-			return false
-		}
+	for c.segmentIdx < len(c.segments) && start >= c.segments[c.segmentIdx][1] {
+		c.segmentIdx++
 	}
-	if end <= c.segments[0][0] {
+	if c.segmentIdx >= len(c.segments) {
 		return false
 	}
-	return true
+	pieceLen := end - start
+	if pieceLen <= 0 {
+		return start >= c.segments[c.segmentIdx][0]
+	}
+	totalOverlap := 0.0
+	for i := c.segmentIdx; i < len(c.segments); i++ {
+		seg := c.segments[i]
+		if seg[0] >= end {
+			break
+		}
+		overlapStart := start
+		if seg[0] > overlapStart {
+			overlapStart = seg[0]
+		}
+		overlapEnd := end
+		if seg[1] < overlapEnd {
+			overlapEnd = seg[1]
+		}
+		totalOverlap += overlapEnd - overlapStart
+	}
+	return totalOverlap/pieceLen > 0.5
 }
 
 func (c *AdCutter) normalizeSegments(segments []app.Segment, duration float64) [][2]float64 {

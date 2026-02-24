@@ -23,14 +23,14 @@ type Streamer struct {
 	nconn             net.Conn
 	rl                *rateLimiter
 	configs           []av.Packet
-	ch                <-chan piece
+	ch                <-chan gop
 	toSkip            chan int64
 	curVideoId        int64
 	curPlaylistItemId int64
 	skip              bool
 }
 
-func NewStreamer(ch <-chan piece, stream app.Stream, playlistLogic *logic.Playlist, play *logic.Play) *Streamer {
+func NewStreamer(ch <-chan gop, stream app.Stream, playlistLogic *logic.Playlist, play *logic.Play) *Streamer {
 	return &Streamer{
 		playlistLogic: playlistLogic,
 		play:          play,
@@ -82,49 +82,49 @@ func (s *Streamer) streamingLoop(ctx context.Context, wg *sync.WaitGroup) {
 			if s.curPlaylistItemId == playlistItemId {
 				s.skip = true
 			}
-		case piece, ok := <-s.ch:
+		case g, ok := <-s.ch:
 			if !ok {
 				return
 			}
-			vctx := log.With(ctx, "video_id", piece.video.Id, "playlist_item_id", piece.playlistItemId)
-			err := s.processPackets(vctx, piece)
+			vctx := log.With(ctx, "video_id", g.video.Id, "playlist_item_id", g.playlistItemId)
+			err := s.processPackets(vctx, g)
 			if err != nil {
-				log.FromContexts(vctx).With("error", err).Errorf("process %d packets", len(piece.packets))
+				log.FromContexts(vctx).With("error", err).Errorf("process %d packets", len(g.packets))
 			}
 		}
 	}
 }
 
-func (s *Streamer) processPackets(ctx context.Context, piece piece) error {
+func (s *Streamer) processPackets(ctx context.Context, g gop) error {
 	// Check if this is a new video or a restart of the same video
-	isNewVideoInstance := piece.video.Id != s.curVideoId ||
-		(len(piece.packets) > 0 && piece.packets[0].Type == av.Metadata)
+	isNewVideoInstance := g.video.Id != s.curVideoId ||
+		(len(g.packets) > 0 && g.packets[0].Type == av.Metadata)
 
 	if isNewVideoInstance {
-		s.playlistLogic.SetCurrent(piece.playlistItemId)
-		s.play.Announce(piece.playlistItemId)
+		s.playlistLogic.SetCurrent(g.playlistItemId)
+		s.play.Announce(g.playlistItemId)
 		s.rl = newRateLimiter()
 		s.configs = s.configs[:0]
-		s.curVideoId = piece.video.Id
-		s.curPlaylistItemId = piece.playlistItemId
+		s.curVideoId = g.video.Id
+		s.curPlaylistItemId = g.playlistItemId
 		s.skip = false
-		log.FromContexts(ctx).Infof("start streaming new video %d", piece.video.Id)
+		log.FromContexts(ctx).Infof("start streaming new video %d", g.video.Id)
 	}
-	if len(piece.packets) == 0 {
+	if len(g.packets) == 0 {
 		return nil
 	}
 	if s.skip {
-		log.FromContexts(ctx).Infof("skipping %d packets", len(piece.packets))
+		log.FromContexts(ctx).Infof("skipping %d packets", len(g.packets))
 		return nil
 	}
-	config, videos, audios := calcPackets(piece.packets)
-	log.FromContexts(ctx).Debugf("processing %d packets from %s to %s; c: %d a: %d v: %d", len(piece.packets), piece.packets[0].Time, piece.packets[len(piece.packets)-1].Time, config, audios, videos)
-	for i := range piece.packets {
-		err := s.processPacket(piece.packets[i])
+	config, videos, audios := calcPackets(g.packets)
+	log.FromContexts(ctx).Debugf("processing %d packets from %s to %s; c: %d a: %d v: %d", len(g.packets), g.packets[0].Time, g.packets[len(g.packets)-1].Time, config, audios, videos)
+	for i := range g.packets {
+		err := s.processPacket(g.packets[i])
 		if err == nil {
 			continue
 		}
-		log.FromContexts(ctx).With("error", err).Errorf("processing packet %q; reconnecting", av.PacketTypeString[piece.packets[i].Type])
+		log.FromContexts(ctx).With("error", err).Errorf("processing packet %q; reconnecting", av.PacketTypeString[g.packets[i].Type])
 		s.reconnect(ctx)
 	}
 	return nil
