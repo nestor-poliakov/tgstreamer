@@ -297,7 +297,7 @@ type Formats struct {
 	LanguagePreference int               `json:"language_preference,omitempty"`
 	DynamicRange       any               `json:"dynamic_range,omitempty"`
 	Container          string            `json:"container,omitempty"`
-	DownloaderOptions  DownloaderOptions `json:"downloader_options,omitempty"`
+	DownloaderOptions  DownloaderOptions `json:"downloader_options"`
 }
 
 type Thumbnails struct {

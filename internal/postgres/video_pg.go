@@ -22,14 +22,14 @@ func (Video) AddFileInfo(ctx context.Context, id int64, fileInfo app.FileInfo) e
 }
 
 func (Video) AddYoutubeInfos(ctx context.Context, videos []app.Video) error {
-	sql := ""
+	var sql strings.Builder
 	vals := make([]any, len(videos)*2)
 	for i, v := range videos {
 		vals[i*2] = v.YtInfo
 		vals[i*2+1] = v.Id
-		sql += fmt.Sprintf(`update video set yt_info = $%d where id = $%d;`, i*2+1, i*2+2)
+		fmt.Fprintf(&sql, `update video set yt_info = $%d where id = $%d;`, i*2+1, i*2+2)
 	}
-	return pg.FromContext(ctx).Query(sql, vals...).ExecContext(ctx)
+	return pg.FromContext(ctx).Query(sql.String(), vals...).ExecContext(ctx)
 }
 
 func (Video) AddSponsorBlockInfo(ctx context.Context, id int64, info app.SponsorBlockInfo) error {

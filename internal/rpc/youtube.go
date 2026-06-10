@@ -147,9 +147,9 @@ func (y *Youtube) parseDuration(str string) int64 {
 		dur += time.Minute * time.Duration(mins)
 		str = str[m+1:]
 	}
-	s := strings.Index(str, "S")
-	if s != -1 {
-		secs, _ := strconv.Atoi(str[:s])
+	before, _, ok := strings.Cut(str, "S")
+	if ok {
+		secs, _ := strconv.Atoi(before)
 		dur += time.Second * time.Duration(secs)
 	}
 	return int64(dur.Seconds())
