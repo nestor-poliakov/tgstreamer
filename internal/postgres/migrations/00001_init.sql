@@ -1,3 +1,4 @@
+-- +goose Up
 create table video (
     id            bigserial not null primary key,
     code          text      not null unique,

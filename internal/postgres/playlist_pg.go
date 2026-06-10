@@ -29,7 +29,7 @@ func (Playlist) CreateList(ctx context.Context, videoIds []int64, streamId int64
 	for i := range videoIds {
 		vals[i*2] = videoIds[i]
 		vals[i*2+1] = streamId
-		qs[i] = "(?,?)"
+		qs[i] = fmt.Sprintf("($%d,$%d)", i*2+1, i*2+2)
 	}
 	sql := `insert into playlist_item (video_id,stream_id) values ` + strings.Join(qs, ",")
 	return pg.FromContext(ctx).Query(sql, vals...).ExecContext(ctx)

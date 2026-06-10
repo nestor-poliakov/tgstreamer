@@ -2,20 +2,19 @@ package pg
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"io/fs"
 	"strings"
 	"time"
 
-	"errors"
 	"tgstreamer/lib/log"
 
-	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/postgres"
-	"github.com/golang-migrate/migrate/v4/source/iofs"
+	_ "github.com/lib/pq"
+	"github.com/pressly/goose/v3"
 )
 
-func Migrate(fs fs.FS, conf Config) {
+func Migrate(migrationsFS fs.FS, conf Config) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	if conf.DropTables {
@@ -39,40 +38,26 @@ func Migrate(fs fs.FS, conf Config) {
 		}
 	}
 
-	d, err := iofs.New(fs, "migrations")
+	db, err := sql.Open("postgres", conf.Dsn)
 	if err != nil {
-		panic(fmt.Errorf("new iofs: %w", err))
+		panic(fmt.Errorf("open postgres conn: %w", err))
 	}
-	defer d.Close()
-	m, err := migrate.NewWithSourceInstance("iofs", d, conf.Dsn)
-	if err != nil {
-		panic(fmt.Errorf("new migrator: %w", err))
+	defer db.Close()
+
+	goose.SetBaseFS(migrationsFS)
+	goose.SetLogger(goose.NopLogger())
+	if err := goose.SetDialect("postgres"); err != nil {
+		panic(fmt.Errorf("set goose dialect: %w", err))
 	}
-	defer m.Close()
-	ver, dirty, err := m.Version()
-	if errors.Is(err, migrate.ErrNilVersion) {
-		err = nil
-	}
+
+	ver, err := goose.GetDBVersionContext(ctx, db)
 	if err != nil {
 		panic(fmt.Errorf("get version: %w", err))
 	}
-	if dirty {
-		err = m.Force(int(ver))
-		if err != nil {
-			panic(fmt.Errorf("migrate dirty version: %w", err))
-		}
+	if err := goose.UpContext(ctx, db, "migrations"); err != nil {
+		panic(fmt.Errorf("migrate up: %w", err))
 	}
-	for {
-		err = m.Up()
-		if err != nil {
-			if errors.Is(err, migrate.ErrNoChange) {
-				break
-			}
-			panic(fmt.Errorf("migrate up: %w", err))
-		}
-	}
-
-	newVer, _, err := m.Version()
+	newVer, err := goose.GetDBVersionContext(ctx, db)
 	if err != nil {
 		panic(fmt.Errorf("get new version: %w", err))
 	}

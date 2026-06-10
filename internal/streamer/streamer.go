@@ -44,9 +44,7 @@ func NewStreamer(ch <-chan gop, stream app.Stream, playlistLogic *logic.Playlist
 }
 
 func (s *Streamer) connect() (err error) {
-	if s.nconn != nil {
-		s.nconn.Close()
-	}
+	s.closeConn()
 	if s.stream.Settings.Url == "" {
 		return fmt.Errorf("empty streaming url")
 	}
@@ -55,6 +53,12 @@ func (s *Streamer) connect() (err error) {
 		return fmt.Errorf("failed to connect to rtmp server %q: %w", s.stream.Settings.Url, err)
 	}
 	return nil
+}
+
+func (s *Streamer) closeConn() {
+	if s.nconn != nil {
+		s.nconn.Close()
+	}
 }
 
 func (s *Streamer) Run(ctx context.Context, wg *sync.WaitGroup) {
@@ -73,7 +77,7 @@ func (s *Streamer) streamingLoop(ctx context.Context, wg *sync.WaitGroup) {
 	log.FromContext(ctx).Info("streamer started")
 	defer wg.Done()
 	defer log.FromContext(ctx).Info("streaming ended; closing connection")
-	defer s.nconn.Close()
+	defer s.closeConn()
 	for {
 		select {
 		case <-ctx.Done():
