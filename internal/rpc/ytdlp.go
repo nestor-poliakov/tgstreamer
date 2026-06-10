@@ -52,6 +52,7 @@ func (y *YtDlpClient) download(ctx context.Context, videoUrl string, fileName st
 		y.touch(ctx, fileName)
 		return fileName, nil
 	}
+	y.selfUpdate(ctx)
 	y.rateLimit(ctx)
 	log.FromContexts(ctx).Info("start downloading video " + videoUrl)
 	t := time.Now()
@@ -82,6 +83,15 @@ func (y *YtDlpClient) download(ctx context.Context, videoUrl string, fileName st
 	log.FromContexts(ctx).Infof("%dMB downloaded for %s", info.Size()/1024/1024, time.Since(t))
 	y.touch(ctx, fileName)
 	return fileName, nil
+}
+
+func (y *YtDlpClient) selfUpdate(ctx context.Context) {
+	cmd := exec.CommandContext(ctx, "yt-dlp", "-U")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stdout
+	if err := cmd.Run(); err != nil {
+		log.FromContexts(ctx).With("error", err).Warn("yt-dlp self-update failed")
+	}
 }
 
 func (y *YtDlpClient) rateLimit(ctx context.Context) {
